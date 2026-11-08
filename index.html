@@ -829,7 +829,7 @@ document.addEventListener('submit',function(e){var f=e.target;if(!f.getAttribute
   var nid='m_'+uid(),m=mkMember(nid,nm,inv.role,S.members.length%COLORS.length,'home');S.members.push(m);if(!inv.multi)inv.used=nm;
   S.me=nid;UI.view='home';logAct(first(nm)+' joined as '+ROLES[inv.role].toLowerCase());S.members.filter(function(x){return x.role==='admin'}).forEach(function(a){notify(a.id,nm+' joined the household','info')});
   commit();toast('You joined '+S.household.name);return}
- if(kind==='household'){S.household.name=(fd.get('name')||'').trim()||S.household.name;S.household.type=fd.get('type');S.household.currency=fd.get('currency')||S.household.currency||'ZMW';if(UI.pending!==undefined)S.household.image=UI.pending;UI.pending=undefined;commit();toast('Household updated');return}
+ if(kind==='household'){S.household.name=(fd.get('name')||'').trim()||S.household.name;S.household.type=fd.get('type');pinCur(fd.get('currency')||S.household.currency||'ZMW');S.household.currency=fd.get('currency')||S.household.currency||'ZMW';if(UI.pending!==undefined)S.household.image=UI.pending;UI.pending=undefined;commit();toast('Household updated');return}
  if(kind==='invite'){var role=fd.get('role'),slug=S.household.name.replace(/[^A-Za-z]/g,'').toUpperCase().slice(0,6)||'HOME',c=slug+'-'+rcode();
   S.invites.unshift({code:c,role:role,created:Date.now(),used:null,multi:false});logAct(first(me().name)+' created an invite for a '+ROLES[role].toLowerCase());commit();return}
  if(kind==='profile'){var mm=me();mm.name=(fd.get('name')||'').trim()||mm.name;if(UI.pending!==undefined)mm.image=UI.pending;UI.pending=undefined;closeModal();commit();toast('Profile saved');return}
@@ -885,8 +885,8 @@ TITLES.calendar='Calendar';TITLES.supplies='Supplies';TITLES.money='Money';
 function todayS(){return ymd(new Date())}
 function parseD(s){return new Date(s+'T00:00')}
 function monday(d){var x=startOfDay(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
-function money(n){var c=(S.household&&S.household.currency)||'ZMW';n=Number(n)||0;
- try{return new Intl.NumberFormat(undefined,{style:'currency',currency:c,minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}).format(n)}catch(e){return c+' '+n.toFixed(2)}}
+function money(n,cur){var c=(cur&&/^[A-Z]{3}$/.test(cur)&&cur)||(S.household&&S.household.currency)||'ZMW';n=Number(n)||0;
+ try{return new Intl.NumberFormat(LANG==='en'?undefined:LANG,{style:'currency',currency:c,minimumFractionDigits:n%1?2:0,maximumFractionDigits:2}).format(n)}catch(e){return c+' '+n.toFixed(2)}}
 function fq(n){return String(Math.round(n*100)/100)}
 function seg(list,act,cur){return '<div class="seg" role="group">'+list.map(function(t){return '<button type="button" data-act="'+act+'" data-t="'+t[0]+'" aria-pressed="'+(cur===t[0])+'">'+t[1]+(t[2]!==undefined?' <span class="n">'+t[2]+'</span>':'')+'</button>'}).join('')+'</div>'}
 function pick(list,sel){return '<option value="">—</option>'}
@@ -937,9 +937,9 @@ function p2Tick(n){var changed=false,today=ymd(n);
  S.bills.forEach(function(b){if(b.status!=='open')return;
   var rd=ymd(addDays(parseD(b.dueDate),-(b.remindDays||0)));
   var to=b.resp&&mb(b.resp)?[b.resp]:S.members.filter(function(m){return m.role==='admin'}).map(function(m){return m.id});
-  if(today>b.dueDate){if(b.odKey!==b.dueDate){b.odKey=b.dueDate;b.remKey=b.dueDate;changed=true;to.forEach(function(i){notify(i,b.name+' ('+money(b.amount)+') is overdue','bill',b.id)});
+  if(today>b.dueDate){if(b.odKey!==b.dueDate){b.odKey=b.dueDate;b.remKey=b.dueDate;changed=true;to.forEach(function(i){notify(i,b.name+' ('+money(b.amount,b.cur)+') is overdue','bill',b.id)});
     if(to.indexOf(S.me)>-1)toast(b.name+' is overdue','Open',function(){openBill(b.id)})}}
-  else if(today>=rd&&b.remKey!==b.dueDate){b.remKey=b.dueDate;changed=true;to.forEach(function(i){notify(i,b.name+' ('+money(b.amount)+') is due '+fmtDue({dueDate:b.dueDate,dueTime:''}).toLowerCase(),'bill',b.id)});
+  else if(today>=rd&&b.remKey!==b.dueDate){b.remKey=b.dueDate;changed=true;to.forEach(function(i){notify(i,b.name+' ('+money(b.amount,b.cur)+') is due '+fmtDue({dueDate:b.dueDate,dueTime:''}).toLowerCase(),'bill',b.id)});
     if(to.indexOf(S.me)>-1)toast(b.name+' is due '+fmtDue({dueDate:b.dueDate,dueTime:''}).toLowerCase(),'Open',function(){openBill(b.id)})}});
  return changed}
 
@@ -959,8 +959,8 @@ function eventsOn(ds){var ev=[],L=UI.cal.layers,wd=parseD(ds).getDay(),today=tod
  if(L.tasks){visibleTasks().forEach(function(t){if(t.dueDate!==ds)return;
   ev.push({type:'task',id:t.id,time:t.dueTime,title:t.title,st:t.status==='done'?'done':dueState(t)==='over'?'missed':'soon',sub:assigneeLabel(t)})})}
  if(L.bills&&canMoney()){S.bills.forEach(function(b){
-  if(b.status==='open'&&b.dueDate===ds)ev.push({type:'bill',id:b.id,time:'',title:b.name,st:ds<today?'missed':'soon',sub:money(b.amount)});
-  b.payments.forEach(function(p){if(p.date===ds)ev.push({type:'bill',id:b.id,time:'',title:b.name+' paid',st:'done',sub:money(p.amount)})})})}
+  if(b.status==='open'&&b.dueDate===ds)ev.push({type:'bill',id:b.id,time:'',title:b.name,st:ds<today?'missed':'soon',sub:money(b.amount,b.cur)});
+  b.payments.forEach(function(p){if(p.date===ds)ev.push({type:'bill',id:b.id,time:'',title:b.name+' paid',st:'done',sub:money(p.amount,p.cur||b.cur)})})})}
  p3Events(ds,ev,L);return ev.sort(function(a,b){var A=a.time?1:0,B=b.time?1:0;if(A!==B)return A-B;if(a.time!==b.time)return a.time<b.time?-1:1;return a.type<b.type?-1:1})}
 var TPRI={bill:0,event:0,fix:1,task:1,meal:2,routine:2};
 function calTitle(){var c=UI.cal,d=parseD(c.date);
@@ -1087,14 +1087,14 @@ function bState(b){var t=todayS();return b.dueDate<t?'over':b.dueDate===t?'today
 function billRow(b){var st=bState(b),r=b.resp?mb(b.resp):null;
  return '<li><div class="bill"><button type="button" class="task-main" data-act="open-bill" data-id="'+b.id+'"><span class="t-title">'+esc(b.name)+'</span><span class="t-meta"><span class="chip mono '+(st==='over'?'bad':st==='today'?'warn':'')+'">'+icon('clock',12)+esc(fmtDue({dueDate:b.dueDate,dueTime:''}))+'</span><span class="chip">'+esc(b.cat)+'</span>'+
  (b.freq!=='once'?'<span class="chip">'+icon('repeat',12)+esc(FREQ[b.freq].toLowerCase())+'</span>':'')+(r?avatar(r,20)+'<span class="hint">'+esc(first(r.name))+'</span>':'')+'</span></button>'+
- '<div class="bill-r"><span class="amt mono">'+esc(money(b.amount))+'</span>'+(P('moneyEdit')?'<button type="button" class="btn sm primary" data-act="pay-bill" data-id="'+b.id+'">Mark paid</button>':'')+'</div></div></li>'}
+ '<div class="bill-r"><span class="amt mono">'+esc(money(b.amount,b.cur))+'</span>'+(P('moneyEdit')?'<button type="button" class="btn sm primary" data-act="pay-bill" data-id="'+b.id+'">Mark paid</button>':'')+'</div></div></li>'}
 function billsHtml(){var open=S.bills.filter(function(b){return b.status==='open'}).sort(function(a,b){return a.dueDate<b.dueDate?-1:1}),t=todayS(),in30=ymd(addDays(new Date(),30)),ym=t.slice(0,7);
  var over=open.filter(function(b){return b.dueDate<t}),soon=open.filter(function(b){return b.dueDate>=t&&b.dueDate<=in30}),sum=function(l){return l.reduce(function(a,b){return a+Number(b.amount)},0)};
- var paidMonth=S.bills.reduce(function(a,b){return a+b.payments.filter(function(p){return p.date.slice(0,7)===ym}).reduce(function(x,p){return x+Number(p.amount)},0)},0);
+ var paidMonth=[];S.bills.forEach(function(b){b.payments.forEach(function(p){if(p.date.slice(0,7)===ym)paidMonth.push({a:p.amount,c:p.cur||billCur(b)})})});
  var pays=[];S.bills.forEach(function(b){b.payments.forEach(function(p){pays.push({p:p,b:b})})});pays.sort(function(a,b){return a.p.date<b.p.date?1:-1});
  var h='<div class="toolbar">'+seg([['open','Unpaid',open.length],['hist','Payment history',pays.length]],'bf',UI.bf)+(P('moneyEdit')?'<button type="button" class="btn primary" data-act="new-bill">'+icon('plus',16)+'Add bill</button>':'')+'</div>';
- h+='<section class="panel" style="margin-bottom:16px"><div class="sumrow"><div><div class="hint">Overdue</div><div class="sumv mono '+(over.length?'bad':'')+'">'+esc(money(sum(over)))+'</div></div><div><div class="hint">Due in 30 days</div><div class="sumv mono">'+esc(money(sum(soon)))+'</div></div><div><div class="hint">Paid this month</div><div class="sumv mono">'+esc(money(paidMonth))+'</div></div></div></section>';
- if(UI.bf==='hist'){return h+'<section class="panel">'+(pays.length?'<ul class="list">'+pays.slice(0,40).map(function(x){var m=mb(x.p.by);return '<li><div class="act">'+avatar(m,24)+'<span>'+esc(x.b.name)+' <span class="hint">paid by '+esc(m?first(m.name):'someone')+'</span></span><span class="when mono">'+esc(money(x.p.amount))+' · '+esc(fmtDue({dueDate:x.p.date,dueTime:''}))+'</span></div></li>'}).join('')+'</ul>':'<div class="empty"><strong>No payments yet</strong>Mark a bill as paid to start the history.</div>')+'</section>'}
+ h+='<section class="panel" style="margin-bottom:16px"><div class="sumrow"><div><div class="hint">Overdue</div><div class="sumv mono '+(over.length?'bad':'')+'">'+esc(msum(over,function(b){return b.amount},billCur))+'</div></div><div><div class="hint">Due in 30 days</div><div class="sumv mono">'+esc(msum(soon,function(b){return b.amount},billCur))+'</div></div><div><div class="hint">Paid this month</div><div class="sumv mono">'+esc(msum(paidMonth,function(x){return x.a},function(x){return x.c}))+'</div></div></div></section>';
+ if(UI.bf==='hist'){return h+'<section class="panel">'+(pays.length?'<ul class="list">'+pays.slice(0,40).map(function(x){var m=mb(x.p.by);return '<li><div class="act">'+avatar(m,24)+'<span>'+esc(x.b.name)+' <span class="hint">paid by '+esc(m?first(m.name):'someone')+'</span></span><span class="when mono">'+esc(money(x.p.amount,x.p.cur||x.b.cur))+' · '+esc(fmtDue({dueDate:x.p.date,dueTime:''}))+'</span></div></li>'}).join('')+'</ul>':'<div class="empty"><strong>No payments yet</strong>Mark a bill as paid to start the history.</div>')+'</section>'}
  h+='<section class="panel">';
  if(!open.length)h+='<div class="empty"><strong>No unpaid bills</strong>Record electricity, water, internet and other household bills to get reminders.</div>';
  else{var g={over:[],week:[],later:[]},w=ymd(addDays(new Date(),7));open.forEach(function(b){(b.dueDate<t?g.over:b.dueDate<=w?g.week:g.later).push(b)});
@@ -1111,9 +1111,9 @@ function jarsHtml(){var act=S.jars.filter(function(j){return j.status==='active'
 function jarCard(j){var tot=jarTotal(j),p=Math.min(1,tot/j.target),mine=j.shares[S.me]!==undefined;
  return '<section class="panel jar"><div class="row" style="justify-content:space-between;align-items:flex-start"><h2 style="font-size:18px">'+esc(j.name)+'</h2>'+(j.status==='complete'?'<span class="chip good">Complete</span>':jarDeadline(j))+'</div>'+
  (j.purpose?'<p class="hint">'+esc(j.purpose)+'</p>':'')+
- '<div><div class="row" style="justify-content:space-between"><span class="mono" style="font-weight:500">'+esc(money(tot))+'</span><span class="hint mono">of '+esc(money(j.target))+' · '+Math.round(p*100)+'%</span></div>'+bar(p,j.name+' progress')+'</div>'+
+ '<div><div class="row" style="justify-content:space-between"><span class="mono" style="font-weight:500">'+esc(money(tot,j.cur))+'</span><span class="hint mono">of '+esc(money(j.target,j.cur))+' · '+Math.round(p*100)+'%</span></div>'+bar(p,j.name+' progress')+'</div>'+
  '<ul class="list">'+Object.keys(j.shares).map(function(id){var m=mb(id);if(!m)return '';var paid=jarPaid(j,id),sh=j.shares[id],full=paid>=sh;
-  return '<li><div class="mcard" style="padding:8px 0">'+avatar(m,26)+'<div class="grow"><span class="nm">'+esc(first(m.name))+'</span></div><span class="mono hint">'+esc(money(paid))+' / '+esc(money(sh))+'</span>'+(full?'<span class="chip good">'+icon('check',12)+'</span>':'')+'</div></li>'}).join('')+'</ul>'+
+  return '<li><div class="mcard" style="padding:8px 0">'+avatar(m,26)+'<div class="grow"><span class="nm">'+esc(first(m.name))+'</span></div><span class="mono hint">'+esc(money(paid,j.cur))+' / '+esc(money(sh,j.cur))+'</span>'+(full?'<span class="chip good">'+icon('check',12)+'</span>':'')+'</div></li>'}).join('')+'</ul>'+
  '<div class="row">'+(j.status==='active'&&P('contribute')?'<button type="button" class="btn primary sm" data-act="contribute" data-id="'+j.id+'">Add contribution</button>':'')+'<button type="button" class="btn sm" data-act="open-jar" data-id="'+j.id+'">Details</button></div></section>'}
 function viewMoney(){if(!canMoney())return '<div class="panel"><div class="empty"><strong>Money is not available</strong>It is turned off for the household or your role.</div></div>';
  return '<div class="stack"><div>'+seg([['bills','Bills',S.bills.filter(function(b){return b.status==='open'}).length],['jars','Money jars',S.jars.filter(function(j){return j.status==='active'}).length]],'money-tab',UI.money)+'</div>'+(UI.money==='jars'?jarsHtml():billsHtml())+'</div>'}
@@ -1121,22 +1121,23 @@ function viewMoney(){if(!canMoney())return '<div class="panel"><div class="empty
 function openBill(id){openModal(function(){return billDetail(id)},true)}
 function billDetail(id){var b=billById(id);if(!b)return mHead('Bill')+'<p>This bill no longer exists.</p>';var r=b.resp?mb(b.resp):null,st=bState(b),can=P('moneyEdit');
  return mHead(b.name)+'<div class="row" style="margin-bottom:12px"><span class="chip">'+esc(b.cat)+'</span>'+(b.status==='paid'?'<span class="chip good">Paid</span>':'<span class="chip '+(st==='over'?'bad':st==='today'?'warn':'accent')+'">'+(st==='over'?'Overdue':'Unpaid')+'</span>')+'</div>'+
- '<dl class="kv"><dt>Amount</dt><dd class="mono">'+esc(money(b.amount))+'</dd><dt>Next due</dt><dd>'+(b.status==='paid'?'Settled':esc(fmtDue({dueDate:b.dueDate,dueTime:''})))+'</dd><dt>Repeats</dt><dd>'+esc(FREQ[b.freq])+'</dd><dt>Responsible</dt><dd>'+(r?esc(r.name):'Not assigned')+'</dd><dt>Reminder</dt><dd>'+(b.remindDays?b.remindDays+' day'+(b.remindDays===1?'':'s')+' before':'On the due date')+'</dd>'+(b.notes?'<dt>Notes</dt><dd>'+esc(b.notes)+'</dd>':'')+'</dl>'+
- '<div class="group-h" style="margin-top:18px">Payments</div>'+(b.payments.length?'<div class="hist">'+b.payments.slice().reverse().slice(0,10).map(function(p){var m=mb(p.by);return '<div><span>'+esc(money(p.amount))+(m?' · '+esc(first(m.name)):'')+'</span><span class="mono">'+esc(p.date)+'</span></div>'}).join('')+'</div>':'<p class="hint">No payments recorded.</p>')+
+ '<dl class="kv"><dt>Amount</dt><dd class="mono">'+esc(money(b.amount,b.cur))+'</dd><dt>Next due</dt><dd>'+(b.status==='paid'?'Settled':esc(fmtDue({dueDate:b.dueDate,dueTime:''})))+'</dd><dt>Repeats</dt><dd>'+esc(FREQ[b.freq])+'</dd><dt>Responsible</dt><dd>'+(r?esc(r.name):'Not assigned')+'</dd><dt>Reminder</dt><dd>'+(b.remindDays?b.remindDays+' day'+(b.remindDays===1?'':'s')+' before':'On the due date')+'</dd>'+(b.notes?'<dt>Notes</dt><dd>'+esc(b.notes)+'</dd>':'')+'</dl>'+
+ '<div class="group-h" style="margin-top:18px">Payments</div>'+(b.payments.length?'<div class="hist">'+b.payments.slice().reverse().slice(0,10).map(function(p){var m=mb(p.by);return '<div><span>'+esc(money(p.amount,p.cur||b.cur))+(m?' · '+esc(first(m.name)):'')+'</span><span class="mono">'+esc(p.date)+'</span></div>'}).join('')+'</div>':'<p class="hint">No payments recorded.</p>')+
  '<div class="sheet-actions">'+((P('settings')||b.createdBy===S.me)&&can?'<button type="button" class="btn danger" data-act="delete-bill" data-id="'+id+'" style="margin-right:auto">'+(UI.confirm==='delb'+id?'Tap again to delete':'Delete')+'</button>':'')+
  (can?'<button type="button" class="btn" data-act="edit-bill" data-id="'+id+'">'+icon('edit',16)+'Edit</button>':'')+(can&&b.status==='open'?'<button type="button" class="btn primary" data-act="pay-bill" data-id="'+id+'">Mark paid</button>':'')+'</div>'}
 function billForm(id){var b=id?billById(id):{name:'',cat:'Electricity',amount:'',dueDate:todayS(),freq:'monthly',resp:S.me,notes:'',remindDays:3};
  return mHead(id?'Edit bill':'Add bill')+'<form class="form" data-form="bill" data-id="'+(id||'')+'">'+
  '<div class="field"><label for="b-name">Name</label><input id="b-name" name="name" type="text" required maxlength="60" value="'+esc(b.name)+'" placeholder="Example: Electricity units"></div>'+
  '<div class="two-col"><div class="field"><label for="b-cat">Category</label><select id="b-cat" name="cat">'+listOpts(BCATS,b.cat)+'</select></div><div class="field"><label for="b-amt">Amount</label><input id="b-amt" name="amount" type="number" min="0" step="any" required value="'+esc(b.amount)+'"></div></div>'+
+ '<div class="field"><label for="b-cur">Currency</label><select id="b-cur" name="cur">'+opts(CURRENCIES,billCur(b))+'</select></div>'+
  '<div class="two-col"><div class="field"><label for="b-due">Due date</label><input id="b-due" name="dueDate" type="date" required value="'+esc(b.dueDate)+'"></div><div class="field"><label for="b-freq">Repeats</label><select id="b-freq" name="freq">'+opts(Object.keys(FREQ).map(function(k){return [k,FREQ[k]]}),b.freq)+'</select></div></div>'+
  '<div class="two-col"><div class="field"><label for="b-resp">Responsible</label><select id="b-resp" name="resp">'+memberOpts(b.resp,'Not assigned')+'</select></div><div class="field"><label for="b-rem">Remind me</label><select id="b-rem" name="remindDays">'+opts([['0','On the due date'],['1','1 day before'],['3','3 days before'],['7','7 days before']],String(b.remindDays))+'</select></div></div>'+
  '<div class="field"><label for="b-notes">Notes</label><textarea id="b-notes" name="notes" maxlength="300" style="min-height:56px">'+esc(b.notes)+'</textarea></div>'+
  '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">'+(id?'Save changes':'Add bill')+'</button></div></form>'}
-function payBill(b){var p={id:uid(),date:todayS(),amount:b.amount,by:S.me,forDue:b.dueDate};b.payments.push(p);
+function payBill(b){var p={id:uid(),date:todayS(),amount:b.amount,cur:billCur(b),by:S.me,forDue:b.dueDate};b.payments.push(p);
  var prev={status:b.status,due:b.dueDate,rem:b.remKey,od:b.odKey};
  if(b.freq==='once')b.status='paid';else{b.dueDate=addFreq(b.dueDate,b.freq);b.remKey='';b.odKey=''}
- logAct(first(me().name)+' paid '+b.name+' ('+money(b.amount)+')');
+ logAct(first(me().name)+' paid '+b.name+' ('+money(b.amount,b.cur)+')');
  toast(b.name+' marked paid','Undo',function(){b.payments=b.payments.filter(function(x){return x.id!==p.id});b.status=prev.status;b.dueDate=prev.due;b.remKey=prev.rem;b.odKey=prev.od;logAct(first(me().name)+' undid the payment for '+b.name);commit()})}
 function jarForm(id){var j=id?jarById(id):{name:'',purpose:'',target:'',deadline:'',split:'equal',shares:{}};
  var parts=id?Object.keys(j.shares):S.members.filter(function(m){return m.role==='admin'||m.role==='member'}).map(function(m){return m.id});
@@ -1144,21 +1145,22 @@ function jarForm(id){var j=id?jarById(id):{name:'',purpose:'',target:'',deadline
  '<div class="field"><label for="j-name2">Name</label><input id="j-name2" name="name" type="text" required maxlength="50" value="'+esc(j.name)+'" placeholder="Example: New fridge"></div>'+
  '<div class="field"><label for="j-purpose">What is it for</label><input id="j-purpose" name="purpose" type="text" maxlength="120" value="'+esc(j.purpose)+'"></div>'+
  '<div class="two-col"><div class="field"><label for="j-target">Target amount</label><input id="j-target" name="target" type="number" min="1" step="any" required value="'+esc(j.target)+'"></div><div class="field"><label for="j-dl">Contribute by</label><input id="j-dl" name="deadline" type="date" value="'+esc(j.deadline)+'"></div></div>'+
+ '<div class="field"><label for="j-cur">Currency</label><select id="j-cur" name="cur">'+opts(CURRENCIES,billCur(j))+'</select></div>'+
  '<div class="field"><span class="lbl">How to split it</span><div class="pickrow"><label class="pick sq"><input type="radio" name="split" value="equal"'+(j.split==='equal'?' checked':'')+'>Equal shares</label><label class="pick sq"><input type="radio" name="split" value="custom"'+(j.split==='custom'?' checked':'')+'>Custom amounts</label></div></div>'+
  '<div class="field"><span class="lbl">Who contributes</span>'+S.members.filter(function(m){return m.role!=='guest'}).map(function(m){return '<div class="jrow"><label class="pick"><input type="checkbox" name="part" value="'+m.id+'"'+(parts.indexOf(m.id)>-1?' checked':'')+'>'+avatar(m,22)+esc(first(m.name))+'</label><input class="share-in" type="number" min="0" step="any" name="share_'+m.id+'" aria-label="Amount for '+esc(first(m.name))+'" value="'+(j.shares[m.id]!==undefined?esc(j.shares[m.id]):'')+'"></div>'}).join('')+'</div>'+
  '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">'+(id?'Save changes':'Create jar')+'</button></div></form>'}
 function contribForm(id){var j=jarById(id),ids=Object.keys(j.shares).filter(function(i){return mb(i)}),self=ids.indexOf(S.me)>-1?S.me:ids[0],canOthers=P('settings');
  var sel=canOthers?self:(ids.indexOf(S.me)>-1?S.me:ids[0]),need=Math.max(0,(j.shares[sel]||0)-jarPaid(j,sel));
- return mHead('Add contribution')+'<p class="hint" style="margin-bottom:12px">'+esc(j.name)+' · '+esc(money(jarTotal(j)))+' of '+esc(money(j.target))+'</p><form class="form" data-form="contrib" data-id="'+id+'">'+
+ return mHead('Add contribution')+'<p class="hint" style="margin-bottom:12px">'+esc(j.name)+' · '+esc(money(jarTotal(j),j.cur))+' of '+esc(money(j.target,j.cur))+'</p><form class="form" data-form="contrib" data-id="'+id+'">'+
  '<div class="field"><label for="c-by">Contributed by</label><select id="c-by" name="by"'+(canOthers?'':' disabled')+'>'+ids.map(function(i){return '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(mb(i).name)+'</option>'}).join('')+'</select></div>'+
  '<div class="two-col"><div class="field"><label for="c-amt">Amount</label><input id="c-amt" name="amount" type="number" min="0.01" step="any" required value="'+(need||'')+'"></div><div class="field"><label for="c-date">Date</label><input id="c-date" name="date" type="date" value="'+todayS()+'"></div></div>'+
  '<div class="field"><label for="c-note">Note</label><input id="c-note" name="note" type="text" maxlength="80"></div>'+
  '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">Record contribution</button></div></form>'}
 function openJar(id){openModal(function(){return jarDetail(id)},true)}
 function jarDetail(id){var j=jarById(id);if(!j)return mHead('Money jar')+'<p>This jar no longer exists.</p>';var tot=jarTotal(j);
- return mHead(j.name)+(j.purpose?'<p style="margin-bottom:12px">'+esc(j.purpose)+'</p>':'')+'<div class="row" style="justify-content:space-between"><span class="mono" style="font-weight:500">'+esc(money(tot))+'</span><span class="hint mono">of '+esc(money(j.target))+'</span></div>'+bar(Math.min(1,tot/j.target),j.name)+
+ return mHead(j.name)+(j.purpose?'<p style="margin-bottom:12px">'+esc(j.purpose)+'</p>':'')+'<div class="row" style="justify-content:space-between"><span class="mono" style="font-weight:500">'+esc(money(tot,j.cur))+'</span><span class="hint mono">of '+esc(money(j.target,j.cur))+'</span></div>'+bar(Math.min(1,tot/j.target),j.name)+
  '<dl class="kv" style="margin-top:12px"><dt>Split</dt><dd>'+(j.split==='equal'?'Equal shares':'Custom amounts')+'</dd><dt>Deadline</dt><dd>'+(j.deadline?esc(fmtDue({dueDate:j.deadline,dueTime:''})):'None')+'</dd></dl>'+
- '<div class="group-h" style="margin-top:18px">Contributions</div>'+(j.contribs.length?'<div class="hist">'+j.contribs.slice().reverse().map(function(c){var m=mb(c.by);return '<div><span>'+esc(money(c.amount))+' · '+esc(m?first(m.name):'Someone')+(c.note?' · '+esc(c.note):'')+'</span><span class="mono">'+esc(c.date)+(P('settings')?' <button type="button" class="link" data-act="del-contrib" data-id="'+j.id+'" data-c="'+c.id+'">Remove</button>':'')+'</span></div>'}).join('')+'</div>':'<p class="hint">Nothing contributed yet.</p>')+
+ '<div class="group-h" style="margin-top:18px">Contributions</div>'+(j.contribs.length?'<div class="hist">'+j.contribs.slice().reverse().map(function(c){var m=mb(c.by);return '<div><span>'+esc(money(c.amount,j.cur))+' · '+esc(m?first(m.name):'Someone')+(c.note?' · '+esc(c.note):'')+'</span><span class="mono">'+esc(c.date)+(P('settings')?' <button type="button" class="link" data-act="del-contrib" data-id="'+j.id+'" data-c="'+c.id+'">Remove</button>':'')+'</span></div>'}).join('')+'</div>':'<p class="hint">Nothing contributed yet.</p>')+
  '<div class="sheet-actions">'+(P('settings')?'<button type="button" class="btn danger" data-act="delete-jar" data-id="'+id+'" style="margin-right:auto">'+(UI.confirm==='delj'+id?'Tap again to delete':'Delete jar')+'</button>':'')+(P('moneyEdit')&&(P('settings')||j.createdBy===S.me)?'<button type="button" class="btn" data-act="edit-jar" data-id="'+id+'">'+icon('edit',16)+'Edit</button>':'')+(j.status==='active'&&P('contribute')?'<button type="button" class="btn primary" data-act="contribute" data-id="'+id+'">Add contribution</button>':'')+'</div>'}
 
 /* ---------- dashboard panels ---------- */
@@ -1173,7 +1175,7 @@ function p2HomeRight(){var h='';
    (rows.length?'<ul class="list">'+rows.slice(0,5).map(function(it){var on=S.groceries.some(function(g){return g.status==='open'&&g.invId===it.id});return '<li><div class="mcard" style="padding:9px 0"><div class="grow"><span class="nm">'+esc(it.name)+'</span></div><span class="mono hint">'+fq(it.qty)+' '+esc(it.unit)+'</span>'+(on?'<span class="chip accent">On the list</span>':'')+'</div></li>'}).join('')+'</ul>':'<div class="empty"><strong>Stocked up</strong>Nothing is below its minimum.</div>')+
    '<p class="hint" style="margin-top:8px">'+onList.length+' item'+(onList.length===1?'':'s')+' on the shopping list</p></section>'}
  if(canMoney()){var jars=S.jars.filter(function(j){return j.status==='active'});
-  if(jars.length)h+='<section class="panel"><div class="panel-h"><h2>Money jars</h2><button type="button" class="link" data-act="go-money" data-t="jars">All jars</button></div>'+jars.slice(0,3).map(function(j){var t=jarTotal(j);return '<div style="padding:8px 0"><div class="row" style="justify-content:space-between"><span class="nm" style="font-weight:600">'+esc(j.name)+'</span><span class="hint mono">'+esc(money(t))+' / '+esc(money(j.target))+'</span></div>'+bar(Math.min(1,t/j.target),j.name)+'</div>'}).join('')+'</section>'}
+  if(jars.length)h+='<section class="panel"><div class="panel-h"><h2>Money jars</h2><button type="button" class="link" data-act="go-money" data-t="jars">All jars</button></div>'+jars.slice(0,3).map(function(j){var t=jarTotal(j);return '<div style="padding:8px 0"><div class="row" style="justify-content:space-between"><span class="nm" style="font-weight:600">'+esc(j.name)+'</span><span class="hint mono">'+esc(money(t,j.cur))+' / '+esc(money(j.target,j.cur))+'</span></div>'+bar(Math.min(1,t/j.target),j.name)+'</div>'}).join('')+'</section>'}
  return h}
 function p2ModuleSwitches(){var h=S.household;
  return '<label class="switch"><span class="tx"><span class="tt">Supplies</span><br><span class="hint">Inventory and the shared shopping list</span></span><input type="checkbox" data-module="inventory"'+(h.modules.inventory?' checked':'')+'></label>'+
@@ -1254,7 +1256,7 @@ function p2Submit(kind,fd,id){
   closeModal();commit();return true}
  if(kind==='bill'){var bn=(fd.get('name')||'').trim(),am=parseFloat(fd.get('amount')),due=fd.get('dueDate');
   if(!bn)return fail('Enter the bill name.'),true;if(!(am>=0))return fail('Enter the amount.'),true;if(!due)return fail('Choose a due date.'),true;
-  var bd={name:bn,cat:fd.get('cat'),amount:am,dueDate:due,freq:fd.get('freq'),resp:fd.get('resp')||'',notes:(fd.get('notes')||'').trim(),remindDays:Number(fd.get('remindDays'))};
+  var bd={name:bn,cat:fd.get('cat'),amount:am,dueDate:due,freq:fd.get('freq'),cur:fd.get('cur')||'',resp:fd.get('resp')||'',notes:(fd.get('notes')||'').trim(),remindDays:Number(fd.get('remindDays'))};
   if(id){var b=billById(id);if(!b)return true;if(b.dueDate!==due){b.remKey='';b.odKey=''}Object.assign(b,bd);if(b.status==='paid'&&b.freq!=='once')b.status='open';logAct(first(me().name)+' edited the bill '+bn)}
   else{S.bills.push(Object.assign({id:uid(),status:'open',payments:[],remKey:'',odKey:'',createdBy:S.me},bd));logAct(first(me().name)+' added the bill '+bn);
    if(bd.resp&&bd.resp!==S.me)notify(bd.resp,first(me().name)+' made you responsible for '+bn,'bill',null)}
@@ -1263,18 +1265,18 @@ function p2Submit(kind,fd,id){
   if(!jn)return fail('Give the jar a name.'),true;if(!(target>0))return fail('Enter a target amount above zero.'),true;if(!parts.length)return fail('Choose at least one person.'),true;
   if(split==='equal'){var each=Math.floor(target/parts.length*100)/100,rest=Math.round((target-each*parts.length)*100)/100;parts.forEach(function(p,i){shares[p]=i===0?Math.round((each+rest)*100)/100:each})}
   else{var sum=0;for(var i=0;i<parts.length;i++){var v=parseFloat(fd.get('share_'+parts[i]));if(!(v>=0))return fail('Enter an amount for each person, or untick them.'),true;shares[parts[i]]=v;sum+=v}
-   if(Math.abs(sum-target)>0.01)return fail('The amounts add up to '+money(sum)+', but the target is '+money(target)+'.'),true}
-  var jd={name:jn,purpose:(fd.get('purpose')||'').trim(),target:target,deadline:fd.get('deadline')||'',split:split,shares:shares};
+   if(Math.abs(sum-target)>0.01)return fail('The amounts add up to '+money(sum,fd.get('cur'))+', but the target is '+money(target,fd.get('cur'))+'.'),true}
+  var jd={name:jn,purpose:(fd.get('purpose')||'').trim(),target:target,cur:fd.get('cur')||'',deadline:fd.get('deadline')||'',split:split,shares:shares};
   if(id){var j=jarById(id);if(!j)return true;Object.assign(j,jd);if(jarTotal(j)>=j.target)j.status='complete';logAct(first(me().name)+' edited the jar '+jn)}
   else{S.jars.push(Object.assign({id:uid(),contribs:[],status:'active',createdBy:S.me},jd));logAct(first(me().name)+' started the money jar '+jn);
-   parts.filter(function(p){return p!==S.me}).forEach(function(p){notify(p,first(me().name)+' started “'+jn+'”. Your share is '+money(shares[p])+'.','jar',null)})}
+   parts.filter(function(p){return p!==S.me}).forEach(function(p){notify(p,first(me().name)+' started “'+jn+'”. Your share is '+money(shares[p],jd.cur)+'.','jar',null)})}
   closeModal();commit();toast(id?'Jar saved':'Money jar created');return true}
  if(kind==='contrib'){var jj=jarById(id);if(!jj)return true;var by=P('settings')?fd.get('by'):(jj.shares[S.me]!==undefined?S.me:Object.keys(jj.shares)[0]),amt=parseFloat(fd.get('amount'));
   if(!(amt>0))return fail('Enter an amount above zero.'),true;
   jj.contribs.push({id:uid(),by:by,amount:amt,date:fd.get('date')||todayS(),note:(fd.get('note')||'').trim()});
-  logAct(first(mb(by)?mb(by).name:'Someone')+' contributed '+money(amt)+' to '+jj.name);
+  logAct(first(mb(by)?mb(by).name:'Someone')+' contributed '+money(amt,jj.cur)+' to '+jj.name);
   closeModal();
-  if(jarTotal(jj)>=jj.target&&jj.status!=='complete'){jj.status='complete';S.members.filter(function(m){return m.role!=='guest'}).forEach(function(m){notify(m.id,'The money jar “'+jj.name+'” reached its goal of '+money(jj.target),'jar',jj.id)});toast(jj.name+' reached its goal')}
+  if(jarTotal(jj)>=jj.target&&jj.status!=='complete'){jj.status='complete';S.members.filter(function(m){return m.role!=='guest'}).forEach(function(m){notify(m.id,'The money jar “'+jj.name+'” reached its goal of '+money(jj.target,jj.cur),'jar',jj.id)});toast(jj.name+' reached its goal')}
   else toast('Contribution recorded');
   commit();return true}
  return p3Submit(kind,fd,id)}
@@ -1401,7 +1403,7 @@ function eventDetail(id){var e=byId(S.events,id);if(!e)return mHead('Event')+'<p
  var waiting=e.people.filter(function(i){return mb(i)&&!e.rsvp[i]}).map(function(i){return first(mb(i).name)});
  var h=mHead(e.title)+'<div class="row" style="margin-bottom:12px"><span class="chip '+(e.kind==='compulsory'?'accent':'')+'">'+EKINDS[e.kind]+'</span>'+rsvpChip(e)+'</div>'+(e.desc?'<p style="margin-bottom:12px">'+esc(e.desc)+'</p>':'')+
  '<dl class="kv"><dt>When</dt><dd>'+esc(evWhen(e))+(e.time?'':' (all day)')+'</dd>'+(e.place?'<dt>Where</dt><dd>'+esc(e.place)+'</dd>':'')+'<dt>Organiser</dt><dd>'+esc(by?by.name:'Unknown')+'</dd>'+
- (e.budget>0?'<dt>Budget</dt><dd class="mono">'+esc(money(e.budget))+'</dd>':'')+(jar?'<dt>Funding</dt><dd>'+esc(jar.name)+' · '+esc(money(jarTotal(jar)))+' of '+esc(money(jar.target))+bar(Math.min(1,jarTotal(jar)/jar.target),jar.name)+'</dd>':'')+
+ (e.budget>0?'<dt>Budget</dt><dd class="mono">'+esc(money(e.budget))+'</dd>':'')+(jar?'<dt>Funding</dt><dd>'+esc(jar.name)+' · '+esc(money(jarTotal(jar),jar.cur))+' of '+esc(money(jar.target,jar.cur))+bar(Math.min(1,jarTotal(jar)/jar.target),jar.name)+'</dd>':'')+
  (src?'<dt>From</dt><dd>Suggestion: '+esc(src.title)+'</dd>':'')+'</dl>';
  if(r)h+='<div class="group-h" style="margin-top:18px">Your reply</div><div class="rsvp">'+[['yes','Attending'],['maybe','Maybe'],['no','Not attending']].map(function(o){return '<button type="button" class="btn sm" data-act="rsvp" data-id="'+id+'" data-v="'+o[0]+'" aria-pressed="'+(r===o[0])+'">'+o[1]+'</button>'}).join('')+'</div>';
  h+='<div class="group-h" style="margin-top:18px">'+(info?'Notified':'Who is coming')+'</div>';
@@ -1863,7 +1865,7 @@ function p4Hint(t){var l=t.toLowerCase(),m,q=/\?|maybe|should we|what about|how 
  return null}
 
 /* ---------- @HomeHub ---------- */
-function p4Handle(raw,th){var t=raw.replace(/@homehub[,:]?/ig,'').trim(),l=t.toLowerCase().replace(/’/g,"'").replace(/[?!.]+$/,'').replace(/\s+/g,' '),m,ctx=S.p5.ctx,say=function(x,p){p4Say(th,x,p)};
+function p4Handle(raw,th,defer){if(localIntent(raw,th,defer))return;var t=raw.replace(/@homehub[,:]?/ig,'').trim(),l=t.toLowerCase().replace(/’/g,"'").replace(/[?!.]+$/,'').replace(/\s+/g,' '),m,ctx=S.p5.ctx,say=function(x,p){p4Say(th,x,p)};
  var open=S.tasks.filter(function(x){return x.status==='open'}),vis=visibleTasks().filter(function(x){return x.status==='open'}),pick=function(q){var f=p4Find(q,vis,function(x){return x.title});
   if(!f.length){say('I couldn’t find an open task matching “'+q+'”.');return null}
   if(f.length>1){say('Which one do you mean? I found: '+f.slice(0,4).map(function(x){return '“'+x.title+'”'}).join(', ')+'.');return null}return f[0]};
@@ -1884,8 +1886,8 @@ function p4Handle(raw,th){var t=raw.replace(/@homehub[,:]?/ig,'').trim(),l=t.toL
   if(!isG&&tg==='many')return say('More than one task matches. Which one do you mean?');
   if(!isG&&tg)return say('This will permanently delete the task “'+tg.title+'”. It can’t be undone. Do you want me to delete it?',{k:'del',d:{id:tg.id,t:'task'},by:S.me,st:'pending'});
   g=p4Find(q,S.groceries.filter(function(x){return x.status==='open'}),function(x){return x.name})[0];
-  if(g)return say('Remove “'+g.name+'” from the shopping list?',{k:'del',d:{id:g.id,t:'groc'},by:S.me,st:'pending'});return say('I couldn’t find anything matching “'+q+'”.')}
- if(/^(?:please )?(?:add|create|schedule|set up|remind us)\b/.test(l)){var rec='none',m2;if(m2=l.match(/\bevery (\w+day)\b/))rec='weekly';else if(/\bevery day\b|\bdaily\b/.test(l))rec='daily';else if(/\bweekly\b|\bevery week\b/.test(l))rec='weekly';
+  if(g)return say('Remove “'+g.name+'” from the shopping list?',{k:'del',d:{id:g.id,t:'groc'},by:S.me,st:'pending'});if(defer)return false;return say('I couldn’t find anything matching “'+q+'”.')}
+ if(/^(?:please )?(?:add|create|schedule|set up|remind us)\b/.test(l)&&!(defer&&(/\b(and|also|then|plus)\b/.test(l)||l.length>70))){var rec='none',m2;if(m2=l.match(/\bevery (\w+day)\b/))rec='weekly';else if(/\bevery day\b|\bdaily\b/.test(l))rec='daily';else if(/\bweekly\b|\bevery week\b/.test(l))rec='weekly';
   var ttl=t.replace(/^(?:please\s+)?(?:add|create|schedule|set up|remind us(?: about| to)?)\s+(?:a\s+)?(?:recurring\s+)?(?:task|reminder)?\s*(?:to|for|called|about)?\s*/i,'').replace(/\s*(?:to |on |for )?(?:every|each)\s+\w+\b.*$/i,'').replace(/\b(today|tomorrow|daily|weekly)\b/ig,'').replace(/\s+(?:on|by)\s+\w*day\b.*$/i,'').replace(/[?!.]+$/,'').trim();
   if(/^(?:the )?(?:trash|garbage|bins?)(?: collection)?$/i.test(ttl))ttl='Take out the trash';if(!ttl)return say('What should the task be called?');ttl=cap(ttl);
   if(!P('create'))return say('Your role can’t create tasks.');var dd=p4Day(l),tn=p4Tok(ttl).join(' '),du=open.filter(function(x){return p4Tok(x.title).join(' ')===tn})[0];
@@ -1893,15 +1895,15 @@ function p4Handle(raw,th){var t=raw.replace(/@homehub[,:]?/ig,'').trim(),l=t.toL
   var pr={k:'task',d:{title:ttl,date:dd,recur:rec},by:S.me,st:'pending'};
   if(rec!=='none'){return say('I can create a recurring task:\n• Task: '+ttl+'\n• Frequency: '+(m2?'Every '+cap(m2[1]):cap(rec))+'\n• Assignment: Unassigned\nWould you like me to create it?',pr)}
   var r2=p4Run(pr,1);return say(r2.text)}
- if(/\b(due|today|to do|overdue|on my plate|my tasks)\b/.test(l)){var mine=/\bmy\b/.test(l)||!P('all'),ls=vis.filter(function(x){var s=dueState(x);return (s==='over'||s==='today')&&(!mine||isMine(x))});
+ if(/\b(due|today|to do|overdue|on my plate|my tasks)\b/.test(l)&&(!defer||(/^(what|whats|what's|anything|any|show|list|which|do i|do we|am i|is there|are there)\b/.test(l)&&l.length<70))){var mine=/\bmy\b/.test(l)||!P('all'),ls=vis.filter(function(x){var s=dueState(x);return (s==='over'||s==='today')&&(!mine||isMine(x))});
   return say(ls.length?(mine?'Due for you':'Due today or overdue')+': '+ls.slice(0,6).map(function(x){return '“'+x.title+'” ('+fmtDue(x)+')'}).join(', ')+'.':'Nothing is due or overdue right now.')}
- if(/\b(recommend|suggest|ideas?|what should|improve|advice)\b/.test(l)){var tips=[],ov=vis.filter(function(x){return dueState(x)==='over'}).length,uc=vis.filter(function(x){return x.assign.mode==='claimable'}).length,gl=S.groceries.filter(function(x){return x.status==='open'}).length;
+ if(/\b(recommend|suggest|ideas?|what should|improve|advice)\b/.test(l)&&(!defer||(/^(any (ideas|suggestions|advice)|what should (we|i) (do|look at|focus on)|how can we improve|give me (ideas|advice|suggestions)|recommendations?)\b/.test(l)&&l.length<60))){var tips=[],ov=vis.filter(function(x){return dueState(x)==='over'}).length,uc=vis.filter(function(x){return x.assign.mode==='claimable'}).length,gl=S.groceries.filter(function(x){return x.status==='open'}).length;
   if(ov)tips.push(ov+' task'+(ov>1?'s are':' is')+' overdue. Worth a quick look.');if(uc)tips.push(uc+' task'+(uc>1?'s':'')+' still need'+(uc>1?'':'s')+' someone to claim '+(uc>1?'them':'it')+'.');
   if(P('moneyView')){var bd=S.bills.filter(function(b){return b.status==='open'&&b.dueDate&&b.dueDate<=ymd(addDays(new Date(),7))}).length;if(bd)tips.push(bd+' bill'+(bd>1?'s fall':' falls')+' due within a week.')}
   if(gl>4)tips.push('The shopping list has '+gl+' items. Someone could plan a shopping trip.');
   var away=S.members.filter(function(x){return ['sick','travel'].indexOf(x.status)>-1&&statusFor(x)}).map(function(x){return first(x.name)});if(away.length)tips.push(jn(away)+' may not manage tasks right now. Consider reassigning.');
   return say(tips.length?'Here is what I would look at:\n• '+tips.join('\n• '):'Everything looks in good shape. Nothing needs attention.')}
- say('I can add shopping items, create or move tasks, assign or remove them, and answer questions like “who’s responsible for the trash?” or “what’s due today?”.')}
+ if(defer)return false;say('I can add shopping items, create or move tasks, assign or remove them, look up or save contacts (“what’s our plumber’s number?”), and answer questions like “who’s responsible for the trash?” or “what’s due today?”. Say “help” for more.')}
 function p4Run(p,direct){var d=p.d,t,tag=direct?' via @HomeHub · done directly':' via @HomeHub · confirmed by '+first(me().name),nm=first(me().name);
  if(p.k==='multi'){var out=[],okc=0;p.list.forEach(function(x){var r=p4Run({k:x.k,d:x.d,by:p.by},direct);out.push(r.text);if(r.ok)okc++});return {ok:okc>0,text:out.join(' ')}}
  if(p.k==='groc'){var ad=[],dp=[];d.items.forEach(function(n){var r=p4Make('grocery',{title:cap(n)},'');if(r==='dup')dp.push(cap(n));else if(r)ad.push(cap(n))});if(ad.length)logAct(nm+' added '+jn(ad)+' to the shopping list'+tag);return {ok:ad.length>0,text:((ad.length?jn(ad)+(ad.length>1?' have':' has')+' been added to the shopping list.':'')+(dp.length?(ad.length?' ':'')+jn(dp)+' already on the list.':''))||'Nothing to add.'}}
@@ -1923,8 +1925,9 @@ function p4Msg(m){var b=m.by==='bot',u=b?null:mb(m.by),h='<div class="msg">'+(b?
  if(m.media&&m.media.k==='img')h+='<button type="button" data-act="p6-view" data-path="'+esc(m.media.path)+'" style="display:block;padding:0;border:0;background:none;margin-top:6px" aria-label="Open photo"><img data-media="'+esc(m.media.path)+'" alt="Shared photo" style="max-width:min(100%,300px);max-height:300px;border-radius:12px;background:var(--surface-2);min-height:80px;min-width:120px"></button>';
  if(m.media&&m.media.k==='aud')h+='<div style="margin-top:6px"><button type="button" class="btn sm" data-act="p6-play" data-path="'+esc(m.media.path)+'">Play voice message · '+Math.floor((m.media.dur||0)/60)+':'+('0'+((m.media.dur||0)%60)).slice(-2)+'</button></div>';
  if(m.poll)h+=p4Poll(m.poll,'chat',m.id);
+ if(m.dir)h+=dirCards(m.dir);
  if(m.prop){var p=m.prop,rq=mb(p.by);h+=p.st==='pending'?(p.by===S.me?'<div class="row" style="margin-top:8px"><button type="button" class="btn primary sm" data-act="p4-ok" data-id="'+m.id+'">'+icon('check',14)+'Confirm</button><button type="button" class="btn sm" data-act="p4-no" data-id="'+m.id+'">Cancel</button></div>':'<div class="hint" style="margin-top:6px">Waiting for '+esc(rq?first(rq.name):'the requester')+' to confirm.</div>'):'<div style="margin-top:6px"><span class="chip '+(p.st==='done'?'good':'')+'">'+(p.st==='done'?'Confirmed':'Cancelled')+'</span></div>'}
- var hn=m.hint;if(hn){if(hn.done)h+='<div style="margin-top:6px"><span class="chip good">'+icon('check',12)+esc(hn.done)+'</span></div>';else if(!hn.gone)h+='<div class="card2"><div class="hint" style="margin-bottom:6px">'+(hn.q?'Sounds like an idea.':'Sounds like a plan.')+' '+({grocery:'Add “'+esc(hn.name)+'” to the shopping list?',event:'Put “'+esc(hn.name)+'” on the calendar for '+esc(fmtDue({dueDate:hn.date,dueTime:''}))+'?',task:'Make “'+esc(hn.name)+'” a task?'}[hn.k])+'</div><div class="row"><button type="button" class="btn sm primary" data-act="p4-hint" data-id="'+m.id+'">'+(hn.q?'Suggest to household':'Yes, create it')+'</button><button type="button" class="btn sm" data-act="p4-hintx" data-id="'+m.id+'">No thanks</button></div></div>'}
+ var hn=m.hint;if(hn&&hn.k==='dir'){if(!hn.gone)h+=dirHintCard(hn,m.id)}else if(hn){if(hn.done)h+='<div style="margin-top:6px"><span class="chip good">'+icon('check',12)+esc(hn.done)+'</span></div>';else if(!hn.gone)h+='<div class="card2"><div class="hint" style="margin-bottom:6px">'+(hn.q?'Sounds like an idea.':'Sounds like a plan.')+' '+({grocery:'Add “'+esc(hn.name)+'” to the shopping list?',event:'Put “'+esc(hn.name)+'” on the calendar for '+esc(fmtDue({dueDate:hn.date,dueTime:''}))+'?',task:'Make “'+esc(hn.name)+'” a task?'}[hn.k])+'</div><div class="row"><button type="button" class="btn sm primary" data-act="p4-hint" data-id="'+m.id+'">'+(hn.q?'Suggest to household':'Yes, create it')+'</button><button type="button" class="btn sm" data-act="p4-hintx" data-id="'+m.id+'">No thanks</button></div></div>'}
  h+='<div class="rx">'+['👍','❤️','😂'].map(function(e){var v=(m.react&&m.react[e])||[];return '<button type="button" data-act="p4-re" data-id="'+m.id+'" data-e="'+e+'" aria-pressed="'+(v.indexOf(S.me)>-1)+'" aria-label="React '+e+'">'+e+(v.length?' '+v.length:'')+'</button>'}).join('')+
   '<button type="button" data-act="p4-pin" data-id="'+m.id+'">'+(m.pin?'Unpin':'Pin')+'</button>'+(!b&&m.text&&!m.hint&&!m.media?'<button type="button" data-act="p4-conv" data-id="'+m.id+'">Make a record</button>':'')+'</div></div></div>';return h}
 function viewChat(){var ms=S.members.filter(function(m){return m.role!=='guest'&&m.id!==S.me}),key=p4Key(),list=S.chat.filter(function(m){return m.th===key}),pins=list.filter(function(m){return m.pin});
@@ -1991,8 +1994,8 @@ function viewInsights(){var now=Date.now(),mo=now-30*864e5,wk=now-7*864e5,mem=S.
  var h='<div class="stack"><div class="grid two"><section class="panel"><div class="panel-h"><h2>Tasks finished, 30 days</h2><span class="mono hint">'+dn.length+' total</span></div>'+by.map(function(x){return '<div class="kvrow"><span>'+esc(first(x[0].name))+'</span>'+p4Bar(x[1]/mx)+'<span class="mono">'+x[1]+'</span></div>'}).join('')+
  '<div class="row" style="margin-top:12px"><span class="chip good">On time: '+(dn.length?Math.round(ot/dn.length*100):0)+'%</span><span class="chip '+(od?'bad':'')+'">Overdue now: '+od+'</span></div></section>'+
  '<section class="panel"><div class="panel-h"><h2>Routines, last 7 days</h2></div>'+(S.routines.length?S.routines.map(function(r){var c=0;for(var i=0;i<7;i++){var run=(S.runs[r.id]||{})[ymd(addDays(new Date(),-i))];if(run&&run.completed)c++}return '<div class="kvrow"><span>'+esc(r.name)+'</span>'+p4Bar(c/7)+'<span class="mono">'+c+'/7</span></div>'}).join(''):'<div class="empty"><strong>No routines</strong></div>')+'</section></div><div class="grid two">';
- if(P('moneyView')){var cats={},tt=0;S.bills.filter(function(b){return b.status==='open'}).forEach(function(b){cats[b.cat||'Other']=(cats[b.cat||'Other']||0)+(Number(b.amount)||0);tt+=Number(b.amount)||0});var ks=Object.keys(cats),cm=Math.max.apply(null,ks.map(function(k){return cats[k]}).concat([1]));
-  h+='<section class="panel"><div class="panel-h"><h2>Open bills by category</h2><span class="mono hint">'+money(tt)+'</span></div>'+(ks.length?ks.map(function(k){return '<div class="kvrow"><span>'+esc(k)+'</span>'+p4Bar(cats[k]/cm)+'<span class="mono">'+money(cats[k])+'</span></div>'}).join(''):'<div class="empty"><strong>No open bills</strong></div>')+'</section>'}
+ if(P('moneyView')){var cats={},cl2={},ob=S.bills.filter(function(b){return b.status==='open'});ob.forEach(function(b){var k=b.cat||'Other';cats[k]=(cats[k]||0)+(Number(b.amount)||0);(cl2[k]=cl2[k]||[]).push(b)});var tt=msum(ob,function(b){return b.amount},billCur),ks=Object.keys(cats),cm=Math.max.apply(null,ks.map(function(k){return cats[k]}).concat([1]));
+  h+='<section class="panel"><div class="panel-h"><h2>Open bills by category</h2><span class="mono hint">'+tt+'</span></div>'+(ks.length?ks.map(function(k){return '<div class="kvrow"><span>'+esc(k)+'</span>'+p4Bar(cats[k]/cm)+'<span class="mono">'+msum(cl2[k],function(b){return b.amount},billCur)+'</span></div>'}).join(''):'<div class="empty"><strong>No open bills</strong></div>')+'</section>'}
  h+='<section class="panel"><div class="panel-h"><h2>This week at a glance</h2></div><dl class="kv"><dt>Shopping items bought</dt><dd>'+S.groceries.filter(function(g){return g.boughtAt>wk}).length+'</dd><dt>Still on the list</dt><dd>'+S.groceries.filter(function(g){return g.status==='open'}).length+'</dd><dt>Chat messages</dt><dd>'+S.chat.filter(function(m){return m.th==='house'&&m.ts>wk}).length+'</dd><dt>Feed posts</dt><dd>'+S.feed.filter(function(p){return p.ts>wk}).length+'</dd><dt>Automation runs</dt><dd>'+S.activity.filter(function(a){return a.ts>wk&&/^Automation/.test(a.text)}).length+'</dd></dl></section></div></div>';return h}
 
 /* ---------- clicks and submits ---------- */
@@ -2025,10 +2028,10 @@ function p4Click(a,el,id){var v=el.getAttribute('data-v');
  case 'p5-ruledel':if(P('auto')){S.rules=S.rules.filter(function(r){return r.id!==id});commit()}return true}
  return false}
 function p4Submit(kind,fd,id){var tx=(fd.get('text')||'').trim();
- if(kind==='msg'){if(!tx||!canChat())return true;var key=p4Key(),m={id:uid(),th:key,by:S.me,text:tx,ts:Date.now(),react:{}},c=S.p5.ctx,follow=c&&Date.now()-c.ts<6e5&&/^(move|reschedule|push|assign|delete|remove|cancel)\s+(it|that)\b/i.test(tx),asked=/@homehub/i.test(tx)||follow;UI.p4d='';UI.p4f=1;
+ if(kind==='msg'){if(!tx||!canChat())return true;var key=p4Key(),m={id:uid(),th:key,by:S.me,text:tx,ts:Date.now(),react:{}},c=S.p5.ctx,follow=c&&Date.now()-c.ts<6e5&&/^(move|reschedule|push|assign|delete|remove|cancel)\s+(it|that)\b/i.test(tx),asked=/@homehub/i.test(tx)||follow||dirAwaiting(key);UI.p4d='';UI.p4f=1;
   if(!asked&&key==='house'){var hn=p4Hint(tx);if(hn)m.hint=hn}S.chat.push(m);
   S.members.forEach(function(x){if(x.id!==S.me&&x.role!=='guest'&&(key==='house'?new RegExp('@'+first(x.name),'i').test(tx):key.indexOf(x.id)>-1))notify(x.id,first(me().name)+': '+tx.slice(0,80),'chat',null)});
-  if(asked){if(p6On()){UI.p6busy=key;commit();p6Run(tx,key).then(function(){UI.p6busy='';commit()});return true}p4Handle(tx,key)}commit();return true}
+  if(asked){if(p4Handle(tx,key,true)===false){if(p6On()){UI.p6busy=key;commit();p6Run(tx,key).then(function(){UI.p6busy='';commit()});return true}p4Handle(tx,key)}}commit();return true}
  if(kind==='poll'){var os=(fd.get('opts')||'').split('\n').map(function(s){return s.trim()}).filter(Boolean).slice(0,6),q=(fd.get('q')||'').trim();if(os.length<2)return fail('Add at least two options.'),true;
   S.chat.push({id:uid(),th:p4Key(),by:S.me,text:'',ts:Date.now(),react:{},poll:{q:q,opts:os.map(function(t){return {t:t,v:[]}})}});closeModal();commit();return true}
  if(kind==='post'){if(!tx&&!UI.p4img&&!UI.p4mp)return true;S.feed.push({id:uid(),by:S.me,kind:fd.get('kind')||'update',text:tx,img:UI.p4img,mpath:UI.p4mp,ts:Date.now(),likes:[],comments:[]});S.feed=S.feed.slice(-40);UI.p4img='';UI.p4mp='';logAct(first(me().name)+' posted to the household feed');
@@ -2150,10 +2153,10 @@ var _p6k=p3Click;p3Click=function(a,el,id){
  if(a==='p6-play'){var p2=el.getAttribute('data-path');el.textContent='Loading…';p6Blob(p2).then(function(u){var au=document.createElement('audio');au.controls=true;au.src=u;au.style.width='100%';au.style.maxWidth='280px';el.replaceWith(au);au.play().catch(function(){})}).catch(function(){el.textContent='Could not load. Tap to retry'});return}
  return _p6k(a,el,id)};
 var _r6=render;render=function(){_r6();p6Hydrate()};
-var _pms2=p3ModuleSwitches;p3ModuleSwitches=function(){var h=S.household;return _pms2()+'<label class="switch"><span class="tx"><span class="tt">AI understanding for @HomeHub</span><br><span class="hint">Free-form requests are sent to Google Gemini’s free tier. Google may use free-tier content to improve its products, so avoid sharing sensitive details with @HomeHub. Without it, @HomeHub understands a limited set of phrases.</span></span><input type="checkbox" data-module="ai"'+(h.modules.ai!==false?' checked':'')+'></label>'};
+var _pms2=p3ModuleSwitches;p3ModuleSwitches=function(){var h=S.household;return _pms2()+'<label class="switch"><span class="tx"><span class="tt">AI understanding for @HomeHub</span><br><span class="hint">Free-form requests are sent to Google Gemini’s free tier. Google may use free-tier content to improve its products, so avoid sharing sensitive details with @HomeHub. Without it, @HomeHub understands a limited set of phrases. Simple requests are always handled on your device first, so the AI is only used when it is really needed.</span></span><input type="checkbox" data-module="ai"'+(h.modules.ai!==false?' checked':'')+'></label>'};
 
 /* ---------- AI ---------- */
-function p6On(){return !!(CLOUD.sess&&CLOUD.hid&&S.household&&S.household.modules.ai!==false&&!CLOUD.aiOff)}
+function p6On(){return !!(CLOUD.sess&&CLOUD.hid&&S.household&&S.household.modules.ai!==false&&!CLOUD.aiOff&&aiNetOk())}
 function p6Context(key){var n=new Date(),dn=function(x){return x},c=S.p5.ctx,vis=visibleTasks().filter(function(t){return t.status==='open'}).slice(0,40).map(function(t){return {id:t.id,title:t.title,due:t.dueDate||'',time:t.dueTime||'',repeats:t.recur,assigned_to:assigneeLabel(t),assignee_ids:t.assign.mode==='members'?t.assign.ids:[]}}),
  mm=me(),ms=S.members.filter(function(m){return m.role!=='guest'}).map(function(m){return {id:m.id,name:first(m.name)}});
  return {today:ymd(n),weekday:DOW[n.getDay()],time:('0'+n.getHours()).slice(-2)+':'+('0'+n.getMinutes()).slice(-2),household:S.household.name,
@@ -2163,7 +2166,7 @@ function p6Context(key){var n=new Date(),dn=function(x){return x},c=S.p5.ctx,vis
   bills_open:P('moneyView')?S.bills.filter(function(b){return b.status==='open'}).slice(0,15).map(function(b){return {name:b.name,amount:b.amount,due:b.dueDate}}):[],
   last_task_id:c&&Date.now()-c.ts<6e5?c.id:'',
   recent_messages:S.chat.filter(function(m){return m.th===key&&m.text}).slice(-6).map(function(m){var u=m.by==='bot'?null:mb(m.by);return {from:m.by==='bot'?'HomeHub':u?first(u.name):'?',text:String(m.text).slice(0,160)}})}}
-async function p6Ask(tx,key){await tokenOk();var r=await fetch(CLOUD.url+'/functions/v1/homehub-ai',{method:'POST',headers:{apikey:CLOUD.key,Authorization:'Bearer '+CLOUD.sess.access_token,'Content-Type':'application/json'},body:JSON.stringify({message:tx.replace(/@homehub[,:]?/ig,'').trim().slice(0,500),context:p6Context(key)})}),t=await r.text(),j=null;try{j=JSON.parse(t)}catch(e){}
+async function p6Ask(tx,key){await tokenOk();var r=await fetch(CLOUD.url+'/functions/v1/homehub-ai',{method:'POST',headers:{apikey:CLOUD.key,Authorization:'Bearer '+CLOUD.sess.access_token,'Content-Type':'application/json'},signal:(function(){var c=new AbortController();setTimeout(function(){c.abort()},12000);return c.signal})(),body:JSON.stringify({message:tx.replace(/@homehub[,:]?/ig,'').trim().slice(0,500),context:p6Context(key)})}),t=await r.text(),j=null;try{j=JSON.parse(t)}catch(e){}
  if(!r.ok||!j){var er=new Error((j&&j.error)||('AI error '+r.status));er.status=r.status;throw er}return j}
 var DRE=/^\d{4}-\d{2}-\d{2}$/;
 function p6Valid(a,notes){if(!a||typeof a!=='object')return null;var vis=visibleTasks().filter(function(t){return t.status==='open'}),tkOf=function(i){return vis.filter(function(t){return t.id===i})[0]},
@@ -2182,8 +2185,287 @@ function p6Valid(a,notes){if(!a||typeof a!=='object')return null;var vis=visible
 function p6Apply(res,key){var notes=[],done=[],pend=[];(Array.isArray(res.actions)?res.actions:[]).slice(0,5).forEach(function(a){var v=p6Valid(a,notes);if(!v)return;if(v.direct){var r=p4Run(Object.assign({by:S.me},v.prop),1);done.push(r.text)}else pend.push(v)});
  var text=String(res.reply||'').slice(0,600);if(done.length)text+=(text?'\n':'')+done.join(' ');if(notes.length)text+=(text?'\n':'')+notes.join(' ');
  if(pend.length){text+=(text?'\n\n':'')+'Waiting for your confirmation:\n'+pend.map(function(v){return '• '+v.desc}).join('\n');p4Say(key,text,{k:'multi',list:pend.map(function(v){return {k:v.prop.k,d:v.prop.d}}),by:S.me,st:'pending'})}else p4Say(key,text||'I’m not sure how to help with that. Could you say it another way?')}
-async function p6Run(tx,key){try{p6Apply(await p6Ask(tx,key),key)}catch(e){if(e.status===404)CLOUD.aiOff=1;
+async function p6Run(tx,key){try{p6Apply(await p6Ask(tx,key),key)}catch(e){if(e.status===404)CLOUD.aiOff=1;else if(e.status===429)CLOUD.aiCool=Date.now()+9e5;else if(netErr(e))CLOUD.aiCool=Date.now()+6e4;
   p4Handle(tx,key);if(!CLOUD.aiNote){CLOUD.aiNote=1;p4Say(key,e.status===429?'(The AI is busy right now, so I used my basic mode.)':e.status===404?'(The AI isn’t set up yet, so I used my basic mode.)':'(The AI isn’t available right now, so I used my basic mode.)')}}}
+
+/* ===== Languages, currencies, Household Directory, local-first @HomeHub ===== */
+/* ---------- languages (UI text is keyed by its English wording; anything missing stays in English) ---------- */
+var LANGS=[['en','English'],['fr','Français'],['es','Español'],['pt','Português'],['sw','Kiswahili']];
+var LI={fr:0,es:1,pt:2,sw:3};
+var LANG=(function(){var s='';try{s=localStorage.getItem('homehub.lang')||''}catch(e){}
+ if(!LANGS.some(function(l){return l[0]===s})){var n=String(navigator.language||'en').slice(0,2).toLowerCase();s=LANGS.some(function(l){return l[0]===n})?n:'en'}return s})();
+var I18N={
+/* navigation and titles */
+'Home':['Accueil','Inicio','Início','Nyumbani'],'Tasks':['Tâches','Tareas','Tarefas','Kazi'],'Calendar':['Calendrier','Calendario','Calendário','Kalenda'],
+'Supplies':['Provisions','Suministros','Suprimentos','Mahitaji ya nyumbani'],'Money':['Argent','Dinero','Dinheiro','Pesa'],'People':['Personnes','Personas','Pessoas','Watu'],
+'Household':['Foyer','Hogar','Lar','Kaya'],'Home care':['Entretien','Mantenimiento','Cuidados da casa','Matengenezo'],'Meals':['Repas','Comidas','Refeições','Milo'],
+'Board':['Tableau d’affichage','Tablón','Mural','Ubao wa matangazo'],'Chat':['Discussion','Chat','Conversa','Mazungumzo'],'Social':['Social','Social','Social','Jamii'],
+'Insights':['Analyses','Resumen','Análises','Muhtasari'],'Automation':['Automatisation','Automatización','Automação','Otomatiki'],'Directory':['Répertoire','Directorio','Diretório','Orodha ya mawasiliano'],
+'More':['Plus','Más','Mais','Zaidi'],
+/* common actions and labels */
+'Save':['Enregistrer','Guardar','Salvar','Hifadhi'],'Save changes':['Enregistrer les modifications','Guardar cambios','Salvar alterações','Hifadhi mabadiliko'],
+'Cancel':['Annuler','Cancelar','Cancelar','Ghairi'],'Delete':['Supprimer','Eliminar','Excluir','Futa'],'Edit':['Modifier','Editar','Editar','Hariri'],
+'Add':['Ajouter','Añadir','Adicionar','Ongeza'],'Search':['Rechercher','Buscar','Pesquisar','Tafuta'],'Close':['Fermer','Cerrar','Fechar','Funga'],
+'Send':['Envoyer','Enviar','Enviar','Tuma'],'Confirm':['Confirmer','Confirmar','Confirmar','Thibitisha'],'Account':['Compte','Cuenta','Conta','Akaunti'],
+'Sign out':['Se déconnecter','Cerrar sesión','Sair','Toka'],'Sign in':['Se connecter','Iniciar sesión','Entrar','Ingia'],'Create account':['Créer un compte','Crear cuenta','Criar conta','Fungua akaunti'],
+'Email':['E-mail','Correo electrónico','E-mail','Barua pepe'],'Password':['Mot de passe','Contraseña','Senha','Nenosiri'],'Name':['Nom','Nombre','Nome','Jina'],
+'Notes':['Notes','Notas','Notas','Maelezo'],'Category':['Catégorie','Categoría','Categoria','Kategoria'],'Edit profile':['Modifier le profil','Editar perfil','Editar perfil','Hariri wasifu'],
+'Language':['Langue','Idioma','Idioma','Lugha'],'Notifications':['Notifications','Notificaciones','Notificações','Arifa'],'Today':['Aujourd’hui','Hoy','Hoje','Leo'],
+'Tomorrow':['Demain','Mañana','Amanhã','Kesho'],'Yesterday':['Hier','Ayer','Ontem','Jana'],'Remove':['Retirer','Quitar','Remover','Ondoa'],'Photo':['Photo','Foto','Foto','Picha'],
+'Voice':['Voix','Voz','Voz','Sauti'],'Open':['Ouvrir','Abrir','Abrir','Fungua'],'None':['Aucun','Ninguno','Nenhum','Hakuna'],'Other':['Autre','Otro','Outro','Nyingine'],
+'Tap again to delete':['Touchez encore pour supprimer','Toca de nuevo para eliminar','Toque de novo para excluir','Gusa tena ili kufuta'],
+'Save details':['Enregistrer les détails','Guardar detalles','Salvar detalhes','Hifadhi maelezo'],'Modules':['Modules','Módulos','Módulos','Moduli'],
+'Invitations':['Invitations','Invitaciones','Convites','Mialiko'],'Comments':['Commentaires','Comentarios','Comentários','Maoni'],
+/* money */
+'Bills':['Factures','Facturas','Contas','Bili'],'Money jars':['Cagnottes','Huchas','Cofrinhos','Vibubu'],'Unpaid':['Impayées','Pendientes','Não pagas','Hazijalipwa'],
+'Payment history':['Historique des paiements','Historial de pagos','Histórico de pagamentos','Historia ya malipo'],'Overdue':['En retard','Vencidas','Em atraso','Zimechelewa'],
+'Due in 30 days':['À payer sous 30 jours','Vencen en 30 días','Vencem em 30 dias','Zinazodaiwa ndani ya siku 30'],'Paid this month':['Payé ce mois-ci','Pagado este mes','Pago este mês','Zilizolipwa mwezi huu'],
+'Add bill':['Ajouter une facture','Añadir factura','Adicionar conta','Ongeza bili'],'Edit bill':['Modifier la facture','Editar factura','Editar conta','Hariri bili'],
+'Mark paid':['Marquer payée','Marcar como pagada','Marcar como paga','Weka imelipwa'],'Amount':['Montant','Importe','Valor','Kiasi'],'Currency':['Devise','Moneda','Moeda','Sarafu'],
+'Due date':['Échéance','Fecha de vencimiento','Data de vencimento','Tarehe ya mwisho'],'Repeats':['Répétition','Se repite','Repete','Hurudia'],'Responsible':['Responsable','Responsable','Responsável','Anayehusika'],
+'Currency for bills and money jars':['Devise par défaut des factures et cagnottes','Moneda predeterminada para facturas y huchas','Moeda padrão para contas e cofrinhos','Sarafu chaguo-msingi ya bili na vibubu'],
+'New money jar':['Nouvelle cagnotte','Nueva hucha','Novo cofrinho','Kibubu kipya'],'Target amount':['Montant cible','Importe objetivo','Valor da meta','Kiasi lengwa'],
+'Add contribution':['Ajouter une contribution','Añadir aportación','Adicionar contribuição','Ongeza mchango'],'Record contribution':['Enregistrer la contribution','Registrar aportación','Registrar contribuição','Rekodi mchango'],
+'Open bills by category':['Factures ouvertes par catégorie','Facturas abiertas por categoría','Contas abertas por categoria','Bili zilizo wazi kwa kategoria'],
+'No unpaid bills':['Aucune facture impayée','No hay facturas pendientes','Nenhuma conta em aberto','Hakuna bili ambazo hazijalipwa'],
+'Jars track who has contributed. HomeHub does not move money.':['Les cagnottes suivent qui a contribué. HomeHub ne déplace pas d’argent.','Las huchas registran quién ha aportado. HomeHub no mueve dinero.','Os cofrinhos mostram quem contribuiu. O HomeHub não movimenta dinheiro.','Vibubu huonyesha nani amechangia. HomeHub haihamishi pesa.'],
+'Default currency for new items. Each bill or money jar can use its own currency.':['Devise par défaut des nouveaux éléments. Chaque facture ou cagnotte peut avoir sa propre devise.','Moneda predeterminada para elementos nuevos. Cada factura o hucha puede usar la suya.','Moeda padrão para novos itens. Cada conta ou cofrinho pode ter a sua.','Sarafu chaguo-msingi kwa vitu vipya. Kila bili au kibubu kinaweza kutumia sarafu yake.'],
+/* chat and assistant */
+'Create a poll':['Créer un sondage','Crear una encuesta','Criar uma enquete','Unda kura ya maoni'],'No messages yet':['Aucun message','Aún no hay mensajes','Ainda sem mensagens','Hakuna ujumbe bado'],
+'Message the household or ask @HomeHub':['Écrire au foyer ou demander à @HomeHub','Escribe al hogar o pregunta a @HomeHub','Escreva para a casa ou pergunte ao @HomeHub','Andikia kaya au uliza @HomeHub'],
+'Message or ask @HomeHub':['Écrire ou demander à @HomeHub','Escribe o pregunta a @HomeHub','Escreva ou pergunte ao @HomeHub','Andika au uliza @HomeHub'],
+'@HomeHub is thinking…':['@HomeHub réfléchit…','@HomeHub está pensando…','@HomeHub está pensando…','@HomeHub anafikiri…'],
+'AI understanding for @HomeHub':['Compréhension par IA pour @HomeHub','Comprensión con IA para @HomeHub','Compreensão por IA para o @HomeHub','Uelewa wa AI kwa @HomeHub'],
+'now':['à l’instant','ahora','agora','sasa'],'min ago':['min','min','min','dak zilizopita'],'h ago':['h','h','h','saa zilizopita'],'d ago':['j','d','d','siku zilizopita'],
+/* roles, statuses, dashboard and settings */
+'Administrator':['Administrateur','Administrador','Administrador','Msimamizi'],'Admin':['Admin','Admin','Admin','Msimamizi'],'Member':['Membre','Miembro','Membro','Mwanachama'],
+'Restricted member':['Membre restreint','Miembro restringido','Membro restrito','Mwanachama mwenye ukomo'],'Guest':['Invité','Invitado','Convidado','Mgeni'],'(you)':['(vous)','(tú)','(você)','(wewe)'],
+'Household name':['Nom du foyer','Nombre del hogar','Nome da casa','Jina la kaya'],'Household type':['Type de foyer','Tipo de hogar','Tipo de lar','Aina ya kaya'],
+'Household details':['Détails du foyer','Detalles del hogar','Detalhes da casa','Maelezo ya kaya'],'Household members':['Membres du foyer','Miembros del hogar','Membros da casa','Wanachama wa kaya'],
+'Family':['Famille','Familia','Família','Familia'],'Family household':['Foyer familial','Hogar familiar','Lar familiar','Kaya la familia'],'Roommates':['Colocataires','Compañeros de piso','Colegas de casa','Wenzi wa chumba'],
+'Rental housing':['Logement locatif','Vivienda de alquiler','Habitação arrendada','Nyumba ya kupangisha'],'Needs attention':['À traiter','Requiere atención','Requer atenção','Inahitaji kuzingatiwa'],
+'Recent activity':['Activité récente','Actividad reciente','Atividade recente','Shughuli za hivi karibuni'],'Coming up':['À venir','Próximamente','A seguir','Vinavyokuja'],
+'Outstanding bills':['Factures en attente','Facturas pendientes','Contas pendentes','Bili zinazosubiri'],'All bills':['Toutes les factures','Todas las facturas','Todas as contas','Bili zote'],
+'Shopping list':['Liste de courses','Lista de la compra','Lista de compras','Orodha ya manunuzi'],'Create a task':['Créer une tâche','Crear una tarea','Criar uma tarefa','Unda kazi'],
+'New task':['Nouvelle tâche','Nueva tarea','Nova tarefa','Kazi mpya'],'New event':['Nouvel événement','Nuevo evento','Novo evento','Tukio jipya'],'Search tasks':['Rechercher des tâches','Buscar tareas','Pesquisar tarefas','Tafuta kazi'],
+'Mine':['Les miennes','Mías','Minhas','Zangu'],'All tasks':['Toutes les tâches','Todas las tareas','Todas as tarefas','Kazi zote'],'Done':['Terminé','Hecho','Concluído','Imekamilika'],
+'Nobody':['Personne','Nadie','Ninguém','Hakuna mtu'],'Who is home':['Qui est à la maison','Quién está en casa','Quem está em casa','Nani yuko nyumbani'],'Your status':['Votre statut','Tu estado','O seu estado','Hali yako'],
+'Away':['Absent','Fuera','Ausente','Hayupo'],'Available':['Disponible','Disponible','Disponível','Anapatikana'],'Travelling':['En voyage','De viaje','Em viagem','Anasafiri'],
+'At work or school':['Au travail ou à l’école','En el trabajo o la escuela','No trabalho ou na escola','Kazini au shuleni'],'Busy or unavailable':['Occupé ou indisponible','Ocupado o no disponible','Ocupado ou indisponível','Ana shughuli au hapatikani'],
+'Sleeping or resting':['Dort ou se repose','Durmiendo o descansando','A dormir ou a descansar','Amelala au anapumzika'],'Sick or recovering':['Malade ou en convalescence','Enfermo o recuperándose','Doente ou a recuperar','Mgonjwa au anapona'],
+'Yes':['Oui','Sí','Sim','Ndiyo'],'Off':['Désactivé','Desactivado','Desligado','Imezimwa'],'Week':['Semaine','Semana','Semana','Wiki'],'Month':['Mois','Mes','Mês','Mwezi'],'Day':['Jour','Día','Dia','Siku'],
+'Routines':['Routines','Rutinas','Rotinas','Taratibu'],'Announcements':['Annonces','Anuncios','Avisos','Matangazo'],'Suggestions':['Suggestions','Sugerencias','Sugestões','Mapendekezo'],'Inventory':['Inventaire','Inventario','Inventário','Hesabu ya bidhaa'],
+'Data on this device':['Données sur cet appareil','Datos en este dispositivo','Dados neste dispositivo','Data kwenye kifaa hiki'],'Erase all data':['Effacer toutes les données','Borrar todos los datos','Apagar todos os dados','Futa data zote'],
+'Create invite code':['Créer un code d’invitation','Crear código de invitación','Criar código de convite','Unda msimbo wa mwaliko'],'What each role can do':['Ce que chaque rôle peut faire','Qué puede hacer cada rol','O que cada papel pode fazer','Kile ambacho kila jukumu linaweza kufanya'],
+'Bill added':['Facture ajoutée','Factura añadida','Conta adicionada','Bili imeongezwa'],'Bill saved':['Facture enregistrée','Factura guardada','Conta salva','Bili imehifadhiwa'],'Next 7 days':['7 prochains jours','Próximos 7 días','Próximos 7 dias','Siku 7 zijazo'],
+'Electricity':['Électricité','Electricidad','Eletricidade','Umeme'],'Water':['Eau','Agua','Água','Maji'],'Rent':['Loyer','Alquiler','Renda','Kodi'],'Garbage collection':['Ramassage des ordures','Recogida de basura','Recolha de lixo','Ukusanyaji wa taka'],
+'monthly':['mensuel','mensual','mensal','kila mwezi'],'weekly':['hebdomadaire','semanal','semanal','kila wiki'],'Nothing urgent':['Rien d’urgent','Nada urgente','Nada urgente','Hakuna cha haraka'],
+'Open calendar':['Ouvrir le calendrier','Abrir calendario','Abrir calendário','Fungua kalenda'],'Tasks and reminders':['Tâches et rappels','Tareas y recordatorios','Tarefas e lembretes','Kazi na vikumbusho'],
+'Add item':['Ajouter un article','Añadir artículo','Adicionar item','Ongeza kitu'],'Nothing to buy':['Rien à acheter','Nada que comprar','Nada para comprar','Hakuna cha kununua'],'Update':['Mettre à jour','Actualizar','Atualizar','Sasisha'],
+/* directory */
+'Search contacts':['Rechercher un contact','Buscar contactos','Pesquisar contactos','Tafuta mawasiliano'],'Add contact':['Ajouter un contact','Añadir contacto','Adicionar contacto','Ongeza mawasiliano'],
+'New contact':['Nouveau contact','Nuevo contacto','Novo contacto','Mawasiliano mapya'],'Edit contact':['Modifier le contact','Editar contacto','Editar contacto','Hariri mawasiliano'],
+'All':['Tous','Todos','Todos','Yote'],'Property':['Logement','Propiedad','Imóvel','Mali'],'Utilities':['Services publics','Servicios básicos','Serviços públicos','Huduma za umma'],
+'Maintenance':['Entretien et réparations','Mantenimiento','Manutenção','Matengenezo'],'Waste Management':['Gestion des déchets','Gestión de residuos','Gestão de resíduos','Usimamizi wa taka'],
+'Food & Delivery':['Restauration et livraison','Comida y reparto','Comida e entrega','Chakula na uwasilishaji'],'Emergency':['Urgences','Emergencias','Emergências','Dharura'],'Events':['Événements','Eventos','Eventos','Matukio'],
+'Call':['Appeler','Llamar','Ligar','Piga simu'],'Text':['SMS','Mensaje','Mensagem','Tuma SMS'],'Website':['Site web','Sitio web','Site','Tovuti'],
+'Phone number':['Numéro de téléphone','Número de teléfono','Número de telefone','Namba ya simu'],'Email address':['Adresse e-mail','Correo electrónico','Endereço de e-mail','Anwani ya barua pepe'],
+'Address or service area':['Adresse ou zone de service','Dirección o zona de servicio','Endereço ou área de atendimento','Anwani au eneo la huduma'],
+'Website or social media link':['Site web ou réseau social','Sitio web o red social','Site ou rede social','Tovuti au mtandao wa kijamii'],'Operating hours':['Heures d’ouverture','Horario','Horário de funcionamento','Saa za kazi'],
+'Phone':['Téléphone','Teléfono','Telefone','Simu'],'Address':['Adresse','Dirección','Endereço','Anwani'],'Hours':['Horaires','Horario','Horário','Saa'],
+'Shared with the household':['Partagé avec le foyer','Compartido con el hogar','Partilhado com a casa','Inashirikiwa na kaya'],'Private to me (this device only)':['Privé (cet appareil uniquement)','Privado (solo este dispositivo)','Privado (apenas este dispositivo)','Binafsi (kifaa hiki tu)'],
+'Private':['Privé','Privado','Privado','Binafsi'],'Who can see it':['Qui peut le voir','Quién puede verlo','Quem pode ver','Nani anaweza kuona'],
+'No contacts yet':['Aucun contact pour l’instant','Aún no hay contactos','Ainda sem contactos','Hakuna mawasiliano bado'],
+'Save your landlord, plumber, electrician, utilities and takeaways here so everyone can find them fast.':['Enregistrez ici propriétaire, plombier, électricien, services et traiteurs pour que tout le monde les trouve vite.','Guarda aquí al casero, fontanero, electricista, servicios y comida a domicilio para encontrarlos rápido.','Guarde aqui o senhorio, canalizador, eletricista, serviços e takeaways para todos encontrarem rápido.','Hifadhi hapa mwenye nyumba, fundi bomba, fundi umeme, huduma na migahawa ili kila mtu apate haraka.'],
+'No contacts match your search':['Aucun contact ne correspond','Ningún contacto coincide','Nenhum contacto corresponde','Hakuna mawasiliano yanayolingana'],
+'Only the name is required. Add whatever else you know.':['Seul le nom est obligatoire. Ajoutez ce que vous savez.','Solo el nombre es obligatorio. Añade lo que sepas.','Só o nome é obrigatório. Adicione o que souber.','Jina pekee ndilo linahitajika. Ongeza unachojua.'],
+'Directory permissions':['Autorisations du répertoire','Permisos del directorio','Permissões do diretório','Ruhusa za orodha'],'Household Directory':['Répertoire du foyer','Directorio del hogar','Diretório da casa','Orodha ya mawasiliano ya kaya'],
+'Contacts for landlords, utilities, repairs and deliveries':['Contacts : propriétaire, services, réparations et livraisons','Contactos de casero, servicios, reparaciones y entregas','Contactos de senhorio, serviços, reparações e entregas','Mawasiliano ya mwenye nyumba, huduma, matengenezo na uwasilishaji'],
+'Who can add or edit shared contacts':['Qui peut ajouter ou modifier les contacts partagés','Quién puede añadir o editar contactos compartidos','Quem pode adicionar ou editar contactos partilhados','Nani anaweza kuongeza au kuhariri mawasiliano ya pamoja'],
+'Administrators and members':['Administrateurs et membres','Administradores y miembros','Administradores e membros','Wasimamizi na wanachama'],'Administrators only':['Administrateurs uniquement','Solo administradores','Apenas administradores','Wasimamizi pekee'],
+'Open directory':['Ouvrir le répertoire','Abrir directorio','Abrir diretório','Fungua orodha'],'Dismiss':['Ignorer','Descartar','Dispensar','Ondoa'],
+'Saved contacts that may help:':['Contacts enregistrés qui peuvent aider :','Contactos guardados que pueden ayudar:','Contactos guardados que podem ajudar:','Mawasiliano yaliyohifadhiwa yanayoweza kusaidia:'],
+'Contact saved':['Contact enregistré','Contacto guardado','Contacto guardado','Mawasiliano yamehifadhiwa'],'Contact deleted':['Contact supprimé','Contacto eliminado','Contacto eliminado','Mawasiliano yamefutwa'],
+'Delete contact':['Supprimer le contact','Eliminar contacto','Excluir contacto','Futa mawasiliano'],'Language of the app on this device':['Langue de l’application sur cet appareil','Idioma de la aplicación en este dispositivo','Idioma da aplicação neste dispositivo','Lugha ya programu kwenye kifaa hiki'],
+'Enter a name for the contact.':['Saisissez un nom pour le contact.','Introduce un nombre para el contacto.','Introduza um nome para o contacto.','Weka jina la mawasiliano.'],
+'That phone number doesn’t look right.':['Ce numéro de téléphone semble incorrect.','Ese número de teléfono no parece correcto.','Esse número de telefone não parece correto.','Namba hiyo ya simu haionekani sahihi.'],
+'That email address doesn’t look right.':['Cette adresse e-mail semble incorrecte.','Ese correo electrónico no parece correcto.','Esse e-mail não parece correto.','Barua pepe hiyo haionekani sahihi.'],
+'Your role can’t add or change shared contacts.':['Votre rôle ne permet pas de modifier les contacts partagés.','Tu rol no permite cambiar contactos compartidos.','O seu papel não permite alterar contactos partilhados.','Jukumu lako haliruhusu kubadilisha mawasiliano ya pamoja.'],
+'Language set to {l}':['Langue : {l}','Idioma: {l}','Idioma: {l}','Lugha: {l}']
+};
+var I18N_REV={};(function(){for(var k in I18N)I18N[k].forEach(function(v){I18N_REV[v]=1})})();
+function t(s){if(LANG==='en')return s;var e=I18N[s];return(e&&e[LI[LANG]])||s}
+function tf(s,o){var r=t(s);for(var k in o)r=r.split('{'+k+'}').join(o[k]);return r}
+var I18N_MISSING={};
+function i18nWalk(el){if(LANG==='en'||!el)return;var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null),n,L=[];while((n=w.nextNode()))L.push(n);
+ L.forEach(function(n){var v=n.nodeValue,s=v.trim();if(!s)return;var p=n.parentNode;if(!p||/^(SCRIPT|STYLE|TEXTAREA)$/.test(p.nodeName))return;if(p.closest&&p.closest('[data-notr]'))return;
+  var e=I18N[s];if(e&&e[LI[LANG]])n.nodeValue=v.replace(s,e[LI[LANG]]);else if(!I18N_REV[s]&&/[A-Za-z]{3}/.test(s)&&s.length<90)I18N_MISSING[s]=1});
+ var at=el.querySelectorAll('[placeholder],[aria-label],[title]');for(var i=0;i<at.length;i++)['placeholder','aria-label','title'].forEach(function(a){var v=at[i].getAttribute(a);if(v){var e=I18N[v];if(e&&e[LI[LANG]])at[i].setAttribute(a,e[LI[LANG]])}})}
+function i18nDates(){var b=LANG==='en'?'en':LANG;for(var i=0;i<7;i++){DAYNAMES[i]=new Date(2023,0,1+i).toLocaleDateString(b,{weekday:'long'});DAYS[i]=new Date(2023,0,1+i).toLocaleDateString(b,{weekday:'narrow'}).toUpperCase()}}
+['toLocaleDateString','toLocaleString','toLocaleTimeString'].forEach(function(k){var o=Date.prototype[k];Date.prototype[k]=function(l,opt){return o.call(this,l===undefined&&LANG!=='en'?LANG:l,opt)}});
+function setLang(v){if(!LANGS.some(function(l){return l[0]===v}))return;LANG=v;try{localStorage.setItem('homehub.lang',v)}catch(e){}document.documentElement.lang=v;i18nDates();curList();render();refreshModal()}
+function langPick(){return '<div class="field" style="margin-top:14px"><label for="lang-sel">'+esc(t('Language'))+'</label><select id="lang-sel" aria-describedby="lang-hint">'+LANGS.map(function(l){return '<option value="'+l[0]+'"'+(l[0]===LANG?' selected':'')+'>'+esc(l[1])+'</option>'}).join('')+'</select><span class="hint" id="lang-hint" data-notr>'+esc(t('Language of the app on this device'))+'</span></div>'}
+ago=function(ts){var m=Math.round((Date.now()-ts)/6e4);if(m<1)return t('now');if(m<60)return m+' '+t('min ago');var h=Math.round(m/60);if(h<24)return h+' '+t('h ago');return Math.round(h/24)+' '+t('d ago')};
+var _oM=openModal;openModal=function(fn,live){_oM(fn,live);i18nWalk($('#modal-root'))};
+var _rM=refreshModal;refreshModal=function(){_rM();i18nWalk($('#modal-root'))};
+var _tT=toast;toast=function(m,l,f){return _tT(t(m),l?t(l):l,f)};
+var _rI=render;render=function(){_rI();i18nWalk(root)};
+var _av=accountView;accountView=function(){var h=_av(),i=h.lastIndexOf('<div class="sheet-actions">');return i<0?h+langPick():h.slice(0,i)+langPick()+h.slice(i)};
+var _cav=cloudAuthView;cloudAuthView=function(){var h=_cav(),i=h.lastIndexOf('</div></div>');return i<0?h:h.slice(0,i)+langPick()+h.slice(i)};
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='lang-sel')setLang(e.target.value)});
+
+/* ---------- currencies ---------- */
+var CUR_CODES=['ZMW','USD','EUR','GBP','ZAR','BWP','MWK','TZS','KES','UGX','NAD','MZN','AOA','CDF','RWF','ETB','GHS','NGN','XOF','XAF','EGP','MAD','ZWG','MUR','AED','SAR','INR','PKR','BDT','CNY','JPY','KRW','SGD','HKD','THB','IDR','PHP','AUD','NZD','CAD','CHF','SEK','NOK','DKK','PLN','TRY','BRL','MXN','ARS'];
+var CUR_FALL={ZMW:'Zambian kwacha',USD:'US dollar',EUR:'Euro',GBP:'British pound',ZAR:'South African rand'};
+function curName(c){try{return new Intl.DisplayNames([LANG==='en'?'en':LANG],{type:'currency'}).of(c)}catch(e){return CUR_FALL[c]||c}}
+function curList(){var l=CUR_CODES.map(function(c){return [c,curName(c)+' ('+c+')']}),pin=['ZMW','USD','EUR','GBP','ZAR'],head=pin.map(function(c){return l.filter(function(x){return x[0]===c})[0]}),rest=l.filter(function(x){return pin.indexOf(x[0])<0}).sort(function(a,b){return a[1].localeCompare(b[1])});
+ CURRENCIES.length=0;head.concat(rest).forEach(function(x){CURRENCIES.push(x)})}
+function houseCur(){return (S.household&&S.household.currency)||'ZMW'}
+function billCur(b){return (b&&/^[A-Z]{3}$/.test(b.cur||'')&&b.cur)||houseCur()}
+function msum(list,fa,fc){var g={},o=[];list.forEach(function(x){var c=(fc&&fc(x))||houseCur();if(!(c in g)){g[c]=0;o.push(c)}g[c]+=Number(fa(x))||0});if(!o.length)return money(0);return o.map(function(c){return money(g[c],c)}).join(' + ')}
+function pinCur(nw){var h=S.household,old=h.currency||'ZMW';if(!nw||nw===old)return;S.bills.forEach(function(b){if(!b.cur)b.cur=old});S.jars.forEach(function(j){if(!j.cur)j.cur=old})}
+curList();i18nDates();document.documentElement.lang=LANG;
+
+/* ---------- Household Directory ---------- */
+var DIRCATS=[['property','Property'],['utilities','Utilities'],['maintenance','Maintenance'],['waste','Waste Management'],['food','Food & Delivery'],['emergency','Emergency'],['events','Events'],['other','Other']];
+function dirCatName(k){var c=DIRCATS.filter(function(x){return x[0]===k})[0];return t(c?c[1]:'Other')}
+Object.assign(PERMS.admin,{dirView:1,dirEdit:1});Object.assign(PERMS.member,{dirView:1,dirEdit:1});Object.assign(PERMS.restricted,{dirView:1});
+Object.assign(IC,{book:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><circle cx="12" cy="8.5" r="1.8"/>',phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>'});
+Object.assign(UI,{dirf:'all',dirq:'',dirAsk:null});TITLES.directory='Directory';VIEWS.directory=viewDirectory;
+var _es2=emptyState;emptyState=function(){var s=_es2();if(!s.directory)s.directory=[];return s};
+function dirOn(){return !!(S.household&&S.household.modules.directory!==false&&P('dirView'))}
+function dirShared(){return Array.isArray(S.directory)?S.directory:[]}
+function dirPrivKey(){return 'homehub.dirp.'+(S.me||'')}
+function dirPriv(){var l=cj(dirPrivKey());return Array.isArray(l)?l:[]}
+function dirPrivSave(l){cj(dirPrivKey(),l)}
+function dirAll(){return dirShared().concat(dirPriv().map(function(c){return Object.assign({},c,{scope:'private'})}))}
+function dirById(id){return dirAll().filter(function(c){return c.id===id})[0]}
+function dirCanAddShared(){var h=S.household;return !!(P('dirEdit')&&(h.dirEditors!=='admins'||me().role==='admin'))}
+function dirCanEdit(c){if(!c)return false;if(c.scope==='private')return true;return dirCanAddShared()}
+function dirCanDelete(c){if(!c)return false;if(c.scope==='private')return true;return dirCanAddShared()&&(me().role==='admin'||c.by===S.me)}
+function telOf(p){return String(p||'').replace(/[^\d+*#]/g,'')}
+function safeUrl(u){u=String(u||'').trim();if(!u)return '';if(/^https?:\/\//i.test(u))return u;if(/^[a-z][a-z0-9+.-]*:/i.test(u))return '';if(/^[^\s]+\.[^\s]{2,}/.test(u))return 'https://'+u;return ''}
+function dirActions(c,sm){var o='',p=telOf(c.phone),em=String(c.email||'').trim(),w=safeUrl(c.website),cl=sm?'btn sm':'btn';
+ if(p)o+='<a class="'+cl+'" href="tel:'+esc(p)+'">'+icon('phone',14)+esc(t('Call'))+'</a><a class="'+cl+'" href="sms:'+esc(p)+'">'+esc(t('Text'))+'</a>';
+ if(em&&/^[^\s@]+@[^\s@]+$/.test(em))o+='<a class="'+cl+'" href="mailto:'+esc(em)+'">'+esc(t('Email'))+'</a>';
+ if(w)o+='<a class="'+cl+'" href="'+esc(w)+'" target="_blank" rel="noopener noreferrer">'+esc(t('Website'))+'</a>';return o}
+function dirRow(c){return '<li><div class="bill"><button type="button" class="task-main" data-act="dir-open" data-id="'+esc(c.id)+'"><span class="t-title">'+esc(c.name)+'</span><span class="t-meta"><span class="chip">'+esc(dirCatName(c.cat))+'</span>'+(c.scope==='private'?'<span class="chip warn">'+esc(t('Private'))+'</span>':'')+(c.phone?'<span class="mono hint">'+esc(c.phone)+'</span>':'')+'</span></button><div class="bill-r" style="gap:6px;flex-wrap:wrap">'+dirActions(c,true)+'</div></div></li>'}
+function dirFiltered(){var q=UI.dirq.trim().toLowerCase(),f=UI.dirf;return dirAll().filter(function(c){if(f!=='all'&&c.cat!==f)return false;
+ return !q||[c.name,c.phone,c.email,c.addr,c.notes,c.website,c.cat,dirCatName(c.cat)].join(' ').toLowerCase().indexOf(q)>-1}).sort(function(a,b){return a.name.localeCompare(b.name)})}
+function dirListHtml(){var l=dirFiltered();if(!l.length)return dirAll().length?'<div class="empty"><strong>'+esc(t('No contacts match your search'))+'</strong></div>':'<div class="empty"><strong>'+esc(t('No contacts yet'))+'</strong>'+esc(t('Save your landlord, plumber, electrician, utilities and takeaways here so everyone can find them fast.'))+'</div>';
+ return '<ul class="list">'+l.map(dirRow).join('')+'</ul>'}
+function viewDirectory(){if(!dirOn())return '<div class="panel"><div class="empty"><strong>'+esc(t('Directory'))+'</strong>'+esc(t('Your role can’t add or change shared contacts.'))+'</div></div>';
+ var counts={};dirAll().forEach(function(c){counts[c.cat]=(counts[c.cat]||0)+1});
+ var segs=[['all',t('All'),dirAll().length]].concat(DIRCATS.filter(function(c){return counts[c[0]]}).map(function(c){return [c[0],t(c[1]),counts[c[0]]]}));
+ return '<div class="stack"><div class="toolbar">'+seg(segs,'dir-cat',UI.dirf)+'<button type="button" class="btn primary" data-act="dir-new">'+icon('plus',16)+esc(t('Add contact'))+'</button>'+'</div>'+
+ '<div class="field"><label class="sr" for="dq">'+esc(t('Search contacts'))+'</label><input id="dq" type="search" placeholder="'+esc(t('Search contacts'))+'" value="'+esc(UI.dirq)+'" autocomplete="off"></div>'+
+ '<section class="panel" id="dir-list">'+dirListHtml()+'</section></div>'}
+document.addEventListener('input',function(e){if(e.target.id==='dq'){UI.dirq=e.target.value;var l=$('#dir-list');if(l){l.innerHTML=dirListHtml();i18nWalk(l)}}});
+function dirDetail(id){var c=dirById(id);if(!c)return mHead(t('Directory'))+'<p>—</p>';var by=c.by&&mb(c.by),kv=function(k,v){return v?'<dt>'+esc(t(k))+'</dt><dd>'+v+'</dd>':''};
+ return mHead(c.name)+'<div class="row" style="margin-bottom:12px;gap:8px"><span class="chip">'+esc(dirCatName(c.cat))+'</span>'+(c.scope==='private'?'<span class="chip warn">'+esc(t('Private'))+'</span>':'')+'</div>'+
+ '<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px">'+dirActions(c,false)+'</div>'+
+ '<dl class="kv">'+kv('Phone',c.phone?'<span class="mono">'+esc(c.phone)+'</span>':'')+kv('Email',esc(c.email))+kv('Address',esc(c.addr))+kv('Website',esc(c.website))+kv('Hours',esc(c.hours))+kv('Notes',esc(c.notes).replace(/\n/g,'<br>'))+'</dl>'+
+ '<div class="sheet-actions">'+(dirCanDelete(c)?'<button type="button" class="btn danger" data-act="dir-del" data-id="'+esc(id)+'" style="margin-right:auto">'+(UI.confirm==='dird'+id?esc(t('Tap again to delete')):esc(t('Delete contact')))+'</button>':'')+(dirCanEdit(c)?'<button type="button" class="btn" data-act="dir-edit" data-id="'+esc(id)+'">'+icon('edit',16)+esc(t('Edit'))+'</button>':'')+'</div>'}
+function dirForm(id){var c=id?dirById(id):{name:'',cat:'other',phone:'',email:'',addr:'',website:'',hours:'',notes:'',scope:dirCanAddShared()?'shared':'private'};
+ var scopeUi=id?'<p class="hint">'+esc(t('Who can see it'))+': '+esc(c.scope==='private'?t('Private to me (this device only)'):t('Shared with the household'))+'</p>':
+  '<div class="field"><span class="lbl">'+esc(t('Who can see it'))+'</span><div class="pickrow">'+(dirCanAddShared()?'<label class="pick sq"><input type="radio" name="scope" value="shared"'+(c.scope==='shared'?' checked':'')+'>'+esc(t('Shared with the household'))+'</label>':'')+'<label class="pick sq"><input type="radio" name="scope" value="private"'+(c.scope==='private'?' checked':'')+'>'+esc(t('Private to me (this device only)'))+'</label></div></div>';
+ return mHead(id?t('Edit contact'):t('New contact'))+'<form class="form" data-form="dir" data-id="'+esc(id||'')+'">'+
+ '<div class="field"><label for="d-name">'+esc(t('Name'))+'</label><input id="d-name" name="name" type="text" required maxlength="80" value="'+esc(c.name)+'"></div>'+
+ '<div class="two-col"><div class="field"><label for="d-cat">'+esc(t('Category'))+'</label><select id="d-cat" name="cat">'+opts(DIRCATS.map(function(x){return [x[0],t(x[1])]}),c.cat)+'</select></div><div class="field"><label for="d-phone">'+esc(t('Phone number'))+'</label><input id="d-phone" name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="off" value="'+esc(c.phone)+'"></div></div>'+
+ '<div class="two-col"><div class="field"><label for="d-email">'+esc(t('Email address'))+'</label><input id="d-email" name="email" type="email" maxlength="100" value="'+esc(c.email)+'"></div><div class="field"><label for="d-web">'+esc(t('Website or social media link'))+'</label><input id="d-web" name="web" type="text" inputmode="url" maxlength="200" value="'+esc(c.website)+'"></div></div>'+
+ '<div class="field"><label for="d-addr">'+esc(t('Address or service area'))+'</label><input id="d-addr" name="addr" type="text" maxlength="160" value="'+esc(c.addr)+'"></div>'+
+ '<div class="field"><label for="d-hours">'+esc(t('Operating hours'))+'</label><input id="d-hours" name="hours" type="text" maxlength="100" value="'+esc(c.hours)+'"></div>'+
+ '<div class="field"><label for="d-notes">'+esc(t('Notes'))+'</label><textarea id="d-notes" name="notes" maxlength="400" style="min-height:56px">'+esc(c.notes)+'</textarea></div>'+scopeUi+
+ '<p class="hint">'+esc(t('Only the name is required. Add whatever else you know.'))+'</p><div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">'+esc(t('Cancel'))+'</button><button class="btn primary" type="submit">'+esc(id?t('Save changes'):t('Save'))+'</button></div></form>'}
+function dirDigits(p){return String(p||'').replace(/\D/g,'')}
+function dirSubmit(fd,id){var name=(fd.get('name')||'').trim(),phone=(fd.get('phone')||'').trim(),email=(fd.get('email')||'').trim(),web=(fd.get('web')||'').trim();
+ if(!name)return fail(t('Enter a name for the contact.')),true;
+ if(phone&&!/^[+()\d\s.\-*#]{3,30}$/.test(phone))return fail(t('That phone number doesn’t look right.')),true;
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return fail(t('That email address doesn’t look right.')),true;
+ var cat=DIRCATS.some(function(x){return x[0]===fd.get('cat')})?fd.get('cat'):'other',data={name:name,cat:cat,phone:phone,email:email,addr:(fd.get('addr')||'').trim(),website:web,hours:(fd.get('hours')||'').trim(),notes:(fd.get('notes')||'').trim(),upd:Date.now()};
+ var ex=id?dirById(id):null,scope=ex?ex.scope:(fd.get('scope')==='private'||!dirCanAddShared()?'private':'shared');
+ if(id&&!ex)return closeModal(),true;
+ if(scope==='shared'){if(!dirCanAddShared())return fail(t('Your role can’t add or change shared contacts.')),true;
+  if(ex){Object.assign(S.directory.filter(function(x){return x.id===id})[0],data);logAct(first(me().name)+' updated the directory contact '+name)}
+  else{S.directory.push(Object.assign({id:'d_'+uid(),by:S.me,ts:Date.now()},data));logAct(first(me().name)+' added '+name+' to the household directory')}}
+ else{var l=dirPriv();if(ex)l=l.map(function(x){return x.id===id?Object.assign({},x,data):x});else l.push(Object.assign({id:'p_'+uid(),by:S.me,ts:Date.now()},data));dirPrivSave(l)}
+ closeModal();commit();toast('Contact saved');return true}
+function dirClick(a,el,id){switch(a){
+ case 'dir-cat':UI.dirf=el.getAttribute('data-t');render();return true;
+ case 'dir-new':if(dirOn())openModal(function(){return dirForm('')});return true;
+ case 'dir-open':openModal(function(){return dirDetail(id)},true);return true;
+ case 'dir-edit':{var c=dirById(id);if(c&&dirCanEdit(c))openModal(function(){return dirForm(id)});return true}
+ case 'dir-del':{var d=dirById(id);if(!d||!dirCanDelete(d))return true;if(UI.confirm==='dird'+id){if(d.scope==='private')dirPrivSave(dirPriv().filter(function(x){return x.id!==id}));else{S.directory=S.directory.filter(function(x){return x.id!==id});logAct(first(me().name)+' removed '+d.name+' from the household directory')}closeModal();commit();toast('Contact deleted')}else{UI.confirm='dird'+id;refreshModal()}return true}
+ case 'go-dir':closeModal();UI.view='directory';render();window.scrollTo(0,0);return true}
+ return false}
+var _pkd=p3Click;p3Click=function(a,el,id){if(dirClick(a,el,id))return;return _pkd(a,el,id)};
+var _psd=p3Submit;p3Submit=function(k,fd,id){if(k==='dir')return dirSubmit(fd,id);return _psd(k,fd,id)};
+var _pnd=p3Nav;p3Nav=function(it){_pnd(it);if(dirOn())it.push({k:'directory',l:'Directory',i:'book'})};
+var _pmd=p3ModuleSwitches;p3ModuleSwitches=function(){var h=S.household,ed=h.dirEditors==='admins'?'admins':'members';
+ return _pmd()+'<label class="switch"><span class="tx"><span class="tt">'+esc(t('Household Directory'))+'</span><br><span class="hint">'+esc(t('Contacts for landlords, utilities, repairs and deliveries'))+'</span></span><input type="checkbox" data-module="directory"'+(h.modules.directory!==false?' checked':'')+'></label>'+
+  '<div class="field" style="margin-top:8px"><label for="dir-ed">'+esc(t('Who can add or edit shared contacts'))+'</label><select id="dir-ed">'+opts([['members',t('Administrators and members')],['admins',t('Administrators only')]],ed)+'</select></div>'};
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='dir-ed'&&S.household&&P('settings')){S.household.dirEditors=e.target.value==='admins'?'admins':'members';logAct(first(me().name)+' changed who can edit the directory');commit()}});
+var _vsd=viewSettings;viewSettings=function(){return _vsd().replace(/(<select id="hh-cur"[^>]*>[\s\S]*?<\/select>)/,'$1<span class="hint">'+esc(t('Default currency for new items. Each bill or money jar can use its own currency.'))+'</span>')};
+VIEWS.settings=viewSettings;
+var _p3m=p3Migrate;p3Migrate=function(){_p3m();if(!S.household)return;if(!Array.isArray(S.directory))S.directory=[]};
+
+/* ---------- local-first @HomeHub (no AI needed for these) ---------- */
+var DIRROLES=[
+ ['maintenance',['plumber','plumbing','electrician','electrical','handyman','mechanic','carpenter','painter','builder','technician','repairman','welder','roofer','locksmith','fundi','pest control']],
+ ['property',['landlord','landlady','caretaker','property manager','estate agent','letting agent']],
+ ['utilities',['zesco','electricity company','water company','water supplier','internet provider','isp','wifi provider','fibre','fiber','dstv','gas supplier']],
+ ['waste',['trash collection','garbage collection','rubbish collection','waste collection','recycling','refuse','bin collection','trash','garbage']],
+ ['food',['takeaway','takeout','pizza','restaurant','delivery','grocer']],
+ ['emergency',['police','ambulance','fire brigade','fire department','hospital','clinic','doctor','vet','pharmacy','emergency']],
+ ['events',['caterer','caterers','decorator','venue','dj','tent hire','equipment rental','event planner','photographer']]];
+function dirRole(l){for(var i=0;i<DIRROLES.length;i++)for(var j=0;j<DIRROLES[i][1].length;j++){var w=DIRROLES[i][1][j];if(new RegExp('\\b'+w.replace(/ /g,'\\s+')+'s?\\b').test(l))return {cat:DIRROLES[i][0],word:w}}return null}
+var DSTOP=/\b(number|numbers|phone|contact|contacts|details|email|address|website|hours|what|whats|who|give|show|find|tell|need|have|got|saved|call|ring|for|our|the|and|please|can|you|get|me|of|is|are|s|do|we|a|an|to|my)\b/g;
+function dirSearch(l,r){var list=dirShared(),out=[];
+ if(r){var stem=r.word.split(' ')[0].slice(0,5),has=function(c){return (c.name+' '+(c.notes||'')).toLowerCase().indexOf(stem)>-1},inCat=list.filter(function(c){return c.cat===r.cat}),byW=list.filter(has);out=byW.length?byW:inCat}
+ else{var tk=l.replace(/[^a-z0-9 ]/g,' ').replace(DSTOP,' ').split(/\s+/).filter(function(w){return w.length>2});if(!tk.length)return [];var best=0,sc=list.map(function(c){var h=(c.name+' '+(c.notes||'')+' '+dirCatName(c.cat)).toLowerCase(),s=tk.filter(function(w){return h.indexOf(w)>-1}).length;if(s>best)best=s;return [c,s]});out=best?sc.filter(function(p){return p[1]===best}).map(function(p){return p[0]}):[]}
+ return out.slice(0,4)}
+function dirLine(c){return c.name+(c.phone?' · '+c.phone:'')+(c.hours?' · '+c.hours:'')+(c.email?'\n'+c.email:'')+(c.addr?'\n'+c.addr:'')}
+function dirCards(ids){var l=(ids||[]).map(function(i){return dirShared().filter(function(c){return c.id===i})[0]}).filter(Boolean);return l.map(function(c){return '<div class="card2"><strong>'+esc(c.name)+'</strong> <span class="chip">'+esc(dirCatName(c.cat))+'</span>'+(c.phone?'<div class="mono hint" style="margin:4px 0">'+esc(c.phone)+'</div>':'')+'<div class="row" style="gap:6px;flex-wrap:wrap">'+dirActions(c,true)+'</div></div>'}).join('')}
+function dirHintCard(hn,mid){var r={cat:hn.cat,word:hn.role},l=dirSearch('',r);if(!l.length)return '';return '<div class="card2"><div class="hint" style="margin-bottom:6px">'+esc(t('Saved contacts that may help:'))+'</div>'+dirCards(l.slice(0,2).map(function(c){return c.id}))+'<div class="row" style="margin-top:6px"><button type="button" class="btn sm" data-act="go-dir">'+esc(t('Open directory'))+'</button><button type="button" class="btn sm" data-act="p4-hintx" data-id="'+esc(mid||'')+'">'+esc(t('Dismiss'))+'</button></div></div>'}
+function capw(s){return s.replace(/\s+/g,' ').trim().replace(/\b[a-z]/g,function(c){return c.toUpperCase()})}
+function dirAwaiting(th){var a=UI.dirAsk;return !!(a&&a.th===th&&Date.now()-a.ts<3e5)}
+function dirMake(name,phone,cat){var c={id:'d_'+uid(),by:S.me,ts:Date.now(),upd:Date.now(),name:name.slice(0,80),cat:cat,phone:phone,email:'',addr:'',website:'',hours:'',notes:'Added via @HomeHub'};S.directory.push(c);logAct(first(me().name)+' added '+c.name+' to the household directory via @HomeHub · done directly');return c}
+function localIntent(raw,th,defer){var t0=raw.replace(/@homehub[,:]?/ig,'').trim(),l=t0.toLowerCase().replace(/’/g,"'").replace(/[?!.]+$/,'').replace(/\s+/g,' '),say=function(x,ids){var m=p4Say(th,x);if(ids&&ids.length)m.dir=ids;return true},m;
+ /* follow-up: "What name should I save it under?" */
+ if(dirAwaiting(th)){var a=UI.dirAsk;UI.dirAsk=null;if(/^(cancel|no|never ?mind|stop|forget it)$/.test(l))return say('Okay, I didn’t save it.');
+  if(l.length>=2&&l.length<=50&&/[a-z]{2}/.test(l)&&!/^(add|show|what|who|move|assign|remove|delete)\b/.test(l)){var c=dirMake(capw(t0),a.phone,a.cat);return say(tf('Saved {n} in {c}.',{n:c.name,c:dirCatName(a.cat)}),[c.id])}}
+ /* save a number */
+ var pm=l.match(/(\+?\d[\d\s().-]{5,}\d)/);
+ if(pm&&dirDigits(pm[1]).length>=7&&dirDigits(pm[1]).length<=15&&/^(?:please )?(?:add|save|store|put|remember|log)\b/.test(l)&&!/\b(shopping|grocery|groceries|task|calendar|event|meeting|bill|remind|reminder)\b/.test(l)){
+  if(!dirOn()||!dirCanAddShared())return say(t('Your role can’t add or change shared contacts.'));
+  var phone=t0.match(/(\+?\d[\d\s().-]{5,}\d)/)[1].trim(),pre=t0.slice(0,t0.indexOf(phone)).replace(/^(?:please\s+)?(?:add|save|store|put|remember|log)\s+/i,'').replace(/\b(?:as|for)\s+(?:our|the|my|a|an)?\s*[\p{L}' &\/-]*$/iu,' ').replace(/\b(this|the|a|new|number|phone|contact|as|at|on|for|is|our|my)\b/ig,' ').replace(/[^\p{L}\p{N}' -]/gu,' ').replace(/\s+/g,' ').trim(),
+   rm=l.match(/\b(?:as|for)\s+(?:our|the|my|a|an)?\s*([a-z][a-z' &/-]{2,40}?)(?=\s*[\d+]|\s*$)/),rl=rm?rm[1].trim():'',role=dirRole(rl||l),cat=role?role.cat:'other';
+  if(pre.length>=2&&/\p{L}{2}/u.test(pre)){var c2=dirMake(capw(pre),phone,cat);return say(tf('Saved {n} in {c}.',{n:c2.name,c:dirCatName(cat)}),[c2.id])}
+  var nm2=rl?capw(rl):'';UI.dirAsk={phone:phone,cat:cat,role:nm2,th:th,ts:Date.now()};
+  return say(tf('I can add this contact to the {c} category. What name should I save it under?',{c:dirCatName(cat)}))}
+ /* find a contact */
+ var lookup=/\b(number|phone|contact|contacts|details|email|address|website|hours)\b/.test(l)||/^(?:who(?:'s| is) (?:our|the|my) |call |ring )/.test(l),role=dirRole(l);
+ if(dirOn()&&lookup&&!/^(?:please )?(?:add|save|store|remember|create|delete|remove)\b/.test(l)){
+  if(/^(?:show|list|open)\s+(?:all |our |the )?(?:contacts|directory)$/.test(l)){var all=dirShared().slice(0,6);return say(all.length?tf('You have {n} shared contacts. Here are the first few:',{n:dirShared().length}):'There are no saved contacts yet.',all.map(function(c){return c.id}))}
+  var f=dirSearch(l,role);
+  if(f.length){var lab=role?role.word:'';return say((f.length>1?'Here are the saved contacts'+(lab?' for “'+lab+'”':'')+':\n':'Here are the saved contact details'+(lab?' for your '+lab:'')+':\n')+f.map(dirLine).join('\n\n'),f.map(function(c){return c.id}))}
+  if(role)return say('I couldn’t find a saved '+role.word+'. You can say “add 0977 123 456 as our '+role.word+'” and I’ll save one.')}
+ /* quick read-only answers */
+ if(P('shopView')&&/^(?:what(?:'s| is)(?: on)?|show|list|read|check)\b.*\b(shopping|grocery|groceries)\b/.test(l)||/^(?:the )?(?:shopping|grocery) list$/.test(l)){var g=S.groceries.filter(function(x){return x.status==='open'});return say(g.length?'On the shopping list ('+g.length+'): '+g.slice(0,12).map(function(x){return x.name}).join(', ')+(g.length>12?'…':'')+'.':'The shopping list is empty.')}
+ if(canMoney()&&/\bbills?\b/.test(l)&&/\b(due|unpaid|owe|upcoming|outstanding|overdue|pending|open)\b/.test(l)&&(!defer||l.length<70)){var b=S.bills.filter(function(x){return x.status==='open'}).sort(function(p,q){return p.dueDate<q.dueDate?-1:1}).slice(0,6);
+  return say(b.length?'Unpaid bills:\n'+b.map(function(x){return '• '+x.name+' · '+money(x.amount,x.cur)+' · '+fmtDue({dueDate:x.dueDate,dueTime:''})}).join('\n'):'There are no unpaid bills.')}
+ if(/^who(?:'s| is|s)? (?:at )?(?:home|here|around|away|in)$/.test(l)||/^who(?:'s| is) home$/.test(l)){var ms=S.members.filter(function(x){return x.role!=='guest'}).map(function(x){var s=statusFor(x);return s?first(x.name)+': '+s.l:null}).filter(Boolean);return say(ms.length?ms.join('\n'):'No one is sharing a status right now.')}
+ if(/^(?:what(?:'s| is)|anything|any|show|list)\b.*\b(events?|happening|coming up|on the calendar|schedule|on this week)\b/.test(l)&&l.length<70){var n=new Date(),ev=S.events.filter(function(e){return e.date>=ymd(n)&&e.date<=ymd(addDays(n,7))}).sort(function(p,q){return (p.date+(p.time||''))<(q.date+(q.time||''))?-1:1}).slice(0,6);
+  return say(ev.length?'Coming up in the next 7 days:\n'+ev.map(function(e){return '• '+e.title+' · '+fmtDue({dueDate:e.date,dueTime:e.time||''})}).join('\n'):'Nothing is on the calendar for the next 7 days.')}
+ if(/^(?:help|what can you do|how do i use you)$/.test(l))return say('I can: add things to the shopping list, create, move, assign or remove tasks, look up saved contacts (“what’s our plumber’s number?”), save a number (“add 0977 123 456 as our electrician”), and show unpaid bills, upcoming events, the shopping list or who is home. Most of this works offline and without AI.');
+ return false}
+/* problem in the house chat -> offer the saved contact */
+var DPROB=[['plumber','maintenance',/\b(leak(?:s|ing)?|burst pipe|blocked (?:drain|sink|toilet|pipe)|toilet (?:is )?(?:blocked|overflowing)|geyser|dripping tap|pipe (?:burst|broke))\b/],['electrician','maintenance',/\b(short circuit|sparking|sparks|tripping|wiring|socket (?:is )?(?:burnt|broken|not working)|burning smell)\b/]];
+var _p4Hint=p4Hint;p4Hint=function(tx){var l=String(tx).toLowerCase();for(var i=0;i<DPROB.length;i++)if(DPROB[i][2].test(l)&&dirOn()&&dirSearch('',{cat:DPROB[i][1],word:DPROB[i][0]}).length)return {k:'dir',role:DPROB[i][0],cat:DPROB[i][1]};return _p4Hint(tx)};
+/* AI only when it is likely to help: online, not on a slow or data-saving connection, not in a cool-down */
+function aiNetOk(){if(navigator.onLine===false)return false;var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return false;return Date.now()>=(CLOUD.aiCool||0)}
+/* debugging helper for translators: HomeHubI18n.missing() lists on-screen text that has no translation yet */
+window.HomeHubI18n={missing:function(){return Object.keys(I18N_MISSING).sort()},setLang:setLang,lang:function(){return LANG}};
 
 /* ---------- boot ---------- */
 S=cloudBoot();p2Migrate();p3Migrate();pruneRuns();if(!S.household)UI.wtab='create';
