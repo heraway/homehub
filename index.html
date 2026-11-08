@@ -268,7 +268,7 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-
 .votebar{display:flex;height:8px;border-radius:6px;overflow:hidden;background:var(--surface-2);border:1px solid var(--line)}
 .votebar .up{background:var(--good);display:block}
 .votebar .down{background:var(--bad);display:block}
-.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.clamp{display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .annc{display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--line);min-width:0}
 .annc:first-child{border-top:0;padding-top:2px}
 .annc p{overflow-wrap:anywhere}
@@ -368,6 +368,166 @@ var S=null, UI={view:'home',tf:'mine',q:'',wtab:'signin',confirm:'',pending:unde
 function emptyState(){return {v:1,household:null,members:[],me:null,invites:[],tasks:[],routines:[],runs:{},notifs:[],activity:[],inventory:[],groceries:[],bills:[],jars:[],events:[],cleaning:[],maint:[],meals:[],suggestions:[],announcements:[],sample:false}}
 function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(o&&o.v===1)return o}}catch(e){}return null}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+var REGION_CURRENCY={};
+function addRegionCurrencies(currency,regions){regions.split(' ').forEach(function(region){REGION_CURRENCY[region]=currency})}
+addRegionCurrencies('USD','US AS EC FM MH MP PA PW PR SV TC TL UM VG VI');
+addRegionCurrencies('EUR','AD AT AX BE BL CY DE EE ES FI FR GF GP GR HR IE IT LT LU LV MC ME MF MQ MT NL PM PT RE SI SK SM TF VA XK YT');
+addRegionCurrencies('GBP','GB GG IM JE');
+addRegionCurrencies('ZMW','ZM');
+addRegionCurrencies('ZAR','ZA');
+addRegionCurrencies('BWP','BW');
+addRegionCurrencies('MWK','MW');
+addRegionCurrencies('TZS','TZ');
+addRegionCurrencies('KES','KE');
+addRegionCurrencies('UGX','UG');
+addRegionCurrencies('NAD','NA');
+addRegionCurrencies('MZN','MZ');
+addRegionCurrencies('AOA','AO');
+addRegionCurrencies('CDF','CD');
+addRegionCurrencies('RWF','RW');
+addRegionCurrencies('ETB','ET');
+addRegionCurrencies('GHS','GH');
+addRegionCurrencies('NGN','NG');
+addRegionCurrencies('XOF','BJ BF CI GW ML NE SN TG');
+addRegionCurrencies('XAF','CM CF CG GA GQ TD');
+addRegionCurrencies('EGP','EG');
+addRegionCurrencies('MAD','MA EH');
+addRegionCurrencies('ZWG','ZW');
+addRegionCurrencies('MUR','MU');
+addRegionCurrencies('AED','AE');
+addRegionCurrencies('SAR','SA');
+addRegionCurrencies('INR','IN');
+addRegionCurrencies('PKR','PK');
+addRegionCurrencies('BDT','BD');
+addRegionCurrencies('CNY','CN');
+addRegionCurrencies('JPY','JP');
+addRegionCurrencies('KRW','KR');
+addRegionCurrencies('SGD','SG');
+addRegionCurrencies('HKD','HK');
+addRegionCurrencies('THB','TH');
+addRegionCurrencies('IDR','ID');
+addRegionCurrencies('PHP','PH');
+addRegionCurrencies('AUD','AU CX CC HM KI NR NF TV');
+addRegionCurrencies('NZD','NZ CK NU PN TK');
+addRegionCurrencies('CAD','CA');
+addRegionCurrencies('CHF','CH LI');
+addRegionCurrencies('SEK','SE');
+addRegionCurrencies('NOK','NO SJ');
+addRegionCurrencies('DKK','DK FO GL');
+addRegionCurrencies('PLN','PL');
+addRegionCurrencies('TRY','TR');
+addRegionCurrencies('BRL','BR');
+addRegionCurrencies('MXN','MX');
+addRegionCurrencies('ARS','AR');
+addRegionCurrencies('RUB','RU');
+addRegionCurrencies('UAH','UA');
+addRegionCurrencies('CZK','CZ');
+addRegionCurrencies('HUF','HU');
+addRegionCurrencies('RON','RO');
+addRegionCurrencies('ISK','IS');
+addRegionCurrencies('ILS','IL PS');
+addRegionCurrencies('KWD','KW');
+addRegionCurrencies('QAR','QA');
+addRegionCurrencies('JOD','JO');
+addRegionCurrencies('LKR','LK');
+addRegionCurrencies('NPR','NP');
+addRegionCurrencies('KZT','KZ');
+addRegionCurrencies('UZS','UZ');
+addRegionCurrencies('VND','VN');
+addRegionCurrencies('MYR','MY');
+addRegionCurrencies('BND','BN');
+addRegionCurrencies('KHR','KH');
+addRegionCurrencies('MMK','MM');
+addRegionCurrencies('LAK','LA');
+addRegionCurrencies('MOP','MO');
+addRegionCurrencies('TWD','TW');
+addRegionCurrencies('FJD','FJ');
+addRegionCurrencies('PGK','PG');
+addRegionCurrencies('XPF','NC PF WF');
+addRegionCurrencies('CLP','CL');
+addRegionCurrencies('COP','CO');
+addRegionCurrencies('PEN','PE');
+addRegionCurrencies('UYU','UY');
+addRegionCurrencies('PYG','PY');
+addRegionCurrencies('BOB','BO');
+addRegionCurrencies('DOP','DO');
+addRegionCurrencies('CRC','CR');
+addRegionCurrencies('GTQ','GT');
+addRegionCurrencies('HNL','HN');
+addRegionCurrencies('NIO','NI');
+addRegionCurrencies('PAB','PA');
+addRegionCurrencies('TTD','TT');
+addRegionCurrencies('JMD','JM');
+addRegionCurrencies('BSD','BS');
+addRegionCurrencies('BBD','BB');
+addRegionCurrencies('BZD','BZ');
+addRegionCurrencies('GYD','GY');
+addRegionCurrencies('SRD','SR');
+addRegionCurrencies('XCD','AG AI DM GD KN LC MS VC');
+addRegionCurrencies('AFN','AF');
+addRegionCurrencies('DZD','DZ');
+addRegionCurrencies('AMD','AM');
+addRegionCurrencies('AZN','AZ');
+addRegionCurrencies('BHD','BH');
+addRegionCurrencies('BYN','BY');
+addRegionCurrencies('KMF','KM');
+addRegionCurrencies('CUP','CU');
+addRegionCurrencies('DJF','DJ');
+addRegionCurrencies('ERN','ER');
+addRegionCurrencies('SZL','SZ');
+addRegionCurrencies('GEL','GE');
+addRegionCurrencies('HTG','HT');
+addRegionCurrencies('IQD','IQ');
+addRegionCurrencies('IRR','IR');
+addRegionCurrencies('KGS','KG');
+addRegionCurrencies('LBP','LB');
+addRegionCurrencies('LYD','LY');
+addRegionCurrencies('MGA','MG');
+addRegionCurrencies('MVR','MV');
+addRegionCurrencies('OMR','OM');
+addRegionCurrencies('SOS','SO');
+addRegionCurrencies('SDG','SD');
+addRegionCurrencies('MRU','MR');
+addRegionCurrencies('GNF','GN');
+addRegionCurrencies('LRD','LR');
+addRegionCurrencies('SLE','SL');
+addRegionCurrencies('GMD','GM');
+addRegionCurrencies('CVE','CV');
+addRegionCurrencies('STN','ST');
+addRegionCurrencies('SCR','SC');
+addRegionCurrencies('SSP','SS');
+addRegionCurrencies('WST','WS');
+addRegionCurrencies('SBD','SB');
+addRegionCurrencies('VUV','VU');
+addRegionCurrencies('YER','YE');
+addRegionCurrencies('SYP','SY');
+addRegionCurrencies('TOP','TO');
+addRegionCurrencies('TMT','TM');
+addRegionCurrencies('ALL','AL');
+addRegionCurrencies('BAM','BA');
+addRegionCurrencies('MKD','MK');
+addRegionCurrencies('RSD','RS');
+addRegionCurrencies('MDL','MD');
+addRegionCurrencies('TJS','TJ');
+addRegionCurrencies('BTN','BT');
+addRegionCurrencies('KPW','KP');
+addRegionCurrencies('BIF','BI');
+addRegionCurrencies('LSL','LS');
+addRegionCurrencies('TND','TN');
+addRegionCurrencies('AWG','AW');
+addRegionCurrencies('ANG','CW SX');
+addRegionCurrencies('VES','VE');
+var TIMEZONE_CURRENCY={'Africa/Lusaka':'ZMW','Africa/Harare':'ZWG','Africa/Johannesburg':'ZAR','Africa/Gaborone':'BWP','Africa/Blantyre':'MWK','Africa/Dar_es_Salaam':'TZS','Africa/Nairobi':'KES','Africa/Kampala':'UGX','Africa/Windhoek':'NAD','Africa/Maputo':'MZN','Africa/Luanda':'AOA','Africa/Kinshasa':'CDF','Africa/Kigali':'RWF','Africa/Addis_Ababa':'ETB','Africa/Accra':'GHS','Africa/Lagos':'NGN','Africa/Dakar':'XOF','Africa/Abidjan':'XOF','Africa/Douala':'XAF','Africa/Cairo':'EGP','Africa/Casablanca':'MAD','Africa/Algiers':'DZD','Africa/Khartoum':'SDG','Africa/Mogadishu':'SOS','Africa/Tripoli':'LYD','Africa/Monrovia':'LRD','Africa/Freetown':'SLE','Africa/Bangui':'XAF','Africa/Bujumbura':'BIF','Africa/Tunis':'TND','Indian/Mauritius':'MUR','Indian/Comoro':'KMF','Indian/Maldives':'MVR','Asia/Dubai':'AED','Asia/Riyadh':'SAR','Asia/Kolkata':'INR','Asia/Karachi':'PKR','Asia/Dhaka':'BDT','Asia/Shanghai':'CNY','Asia/Tokyo':'JPY','Asia/Seoul':'KRW','Asia/Pyongyang':'KPW','Asia/Singapore':'SGD','Asia/Hong_Kong':'HKD','Asia/Bangkok':'THB','Asia/Jakarta':'IDR','Asia/Manila':'PHP','Asia/Kabul':'AFN','Asia/Baku':'AZN','Asia/Yerevan':'AMD','Asia/Bahrain':'BHD','Asia/Baghdad':'IQD','Asia/Tehran':'IRR','Asia/Bishkek':'KGS','Asia/Beirut':'LBP','Asia/Muscat':'OMR','Asia/Ulaanbaatar':'MNT','Asia/Damascus':'SYP','Asia/Ashgabat':'TMT','Asia/Aden':'YER','Asia/Thimphu':'BTN','Asia/Dushanbe':'TJS','Australia/Sydney':'AUD','Pacific/Auckland':'NZD','Pacific/Apia':'WST','Pacific/Guadalcanal':'SBD','Pacific/Efate':'VUV','Pacific/Tongatapu':'TOP','America/Toronto':'CAD','America/Montreal':'CAD','America/Vancouver':'CAD','America/Winnipeg':'CAD','America/Edmonton':'CAD','America/Halifax':'CAD','America/New_York':'USD','America/Chicago':'USD','America/Denver':'USD','America/Los_Angeles':'USD','America/Phoenix':'USD','America/Anchorage':'USD','America/Mexico_City':'MXN','America/Cancun':'MXN','America/Tijuana':'MXN','America/Sao_Paulo':'BRL','America/Rio_Branco':'BRL','America/Argentina/Buenos_Aires':'ARS','America/Caracas':'VES','America/Curacao':'ANG','America/Aruba':'AWG','Europe/London':'GBP','Europe/Paris':'EUR','Europe/Berlin':'EUR','Europe/Madrid':'EUR','Europe/Rome':'EUR','Europe/Amsterdam':'EUR','Europe/Brussels':'EUR','Europe/Lisbon':'EUR','Europe/Athens':'EUR','Europe/Vienna':'EUR','Europe/Helsinki':'EUR','Europe/Dublin':'EUR','Europe/Zurich':'CHF','Europe/Stockholm':'SEK','Europe/Oslo':'NOK','Europe/Copenhagen':'DKK','Europe/Warsaw':'PLN','Europe/Istanbul':'TRY','Europe/Moscow':'RUB','Europe/Kyiv':'UAH','Europe/Prague':'CZK','Europe/Budapest':'HUF','Europe/Bucharest':'RON','Europe/Tirane':'ALL','Europe/Sarajevo':'BAM','Europe/Skopje':'MKD','Europe/Belgrade':'RSD','Europe/Chisinau':'MDL','Atlantic/Reykjavik':'ISK','Asia/Jerusalem':'ILS','Asia/Kuwait':'KWD','Asia/Qatar':'QAR','Asia/Amman':'JOD','Asia/Colombo':'LKR','Asia/Kathmandu':'NPR','Asia/Almaty':'KZT','Asia/Tashkent':'UZS','Asia/Ho_Chi_Minh':'VND','Asia/Kuala_Lumpur':'MYR','Asia/Brunei':'BND','Asia/Phnom_Penh':'KHR','Asia/Yangon':'MMK','Asia/Vientiane':'LAK','Asia/Macau':'MOP','Asia/Taipei':'TWD','Pacific/Fiji':'FJD','Pacific/Port_Moresby':'PGK','Pacific/Noumea':'XPF','America/Santiago':'CLP','America/Bogota':'COP','America/Lima':'PEN','America/Montevideo':'UYU','America/Asuncion':'PYG','America/La_Paz':'BOB','America/Santo_Domingo':'DOP','America/Costa_Rica':'CRC','America/Guatemala':'GTQ','America/Tegucigalpa':'HNL','America/Managua':'NIO','America/Port_of_Spain':'TTD','America/Jamaica':'JMD','America/Nassau':'BSD','America/Barbados':'BBD','America/Belize':'BZD','America/Guyana':'GYD','America/Paramaribo':'SRD','America/Puerto_Rico':'USD','America/Panama':'PAB'};
+function defaultCurrency(){
+ var zone='';try{zone=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
+ if(TIMEZONE_CURRENCY[zone])return TIMEZONE_CURRENCY[zone];
+ var locales=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||''];
+ for(var i=0;i<locales.length;i++){var region='';
+  try{if(Intl.Locale)region=new Intl.Locale(locales[i]).region||''}catch(e){}
+  if(!region){var parts=String(locales[i]).split(/[-_]/);for(var j=1;j<parts.length;j++)if(/^[A-Za-z]{2}$/.test(parts[j])){region=parts[j].toUpperCase();break}}
+  if(region&&REGION_CURRENCY[region])return REGION_CURRENCY[region]}
+ return 'ZMW'
+}
 
 function mkMember(id,name,role,color,status,vis){return {id:id,name:name,role:role,color:color,status:status||'home',vis:vis||'everyone',image:'',prefs:{tasks:true,routines:true,reminders:true},joined:Date.now()}}
 function mkTask(o){var t={id:uid(),title:'',desc:'',notes:'',priority:'med',assign:{mode:'members',ids:[]},dueDate:'',dueTime:'',recur:'none',reminder:'',status:'open',createdBy:null,created:Date.now(),completedAt:0,completedBy:null,reminded:false,history:[]};for(var k in o)t[k]=o[k];return t}
@@ -377,7 +537,7 @@ function seed(){
  var t=new Date(),d=function(n){return ymd(addDays(t,n))},H=function(n){return Date.now()-n*36e5};
  var mu='m_mutinta',ch='m_chanda',lu='m_lubinda',na='m_natasha',bw='m_bwalya';
  var s=emptyState();
- s.household={id:uid(),name:'The Mwansa Family',type:'family',image:'',modules:{tasks:true,routines:true,inventory:true,bills:true,events:true,cleaning:true,meals:true,suggestions:true,announcements:true},currency:'ZMW',autoAdd:true,created:Date.now()};
+ s.household={id:uid(),name:'The Mwansa Family',type:'family',image:'',modules:{tasks:true,routines:true,inventory:true,bills:true,events:true,cleaning:true,meals:true,suggestions:true,announcements:true},currency:defaultCurrency(),autoAdd:true,created:Date.now()};
  s.members=[mkMember(mu,'Mutinta Mwansa','admin',0,'home'),mkMember(ch,'Chanda Mwansa','member',1,'work'),mkMember(lu,'Lubinda Mwansa','member',2,'home'),
   mkMember(na,'Natasha Mwansa','restricted',4,'work'),mkMember('m_bwalya_x','x','guest',3,'away')];
  s.members[4].id=bw;s.members[4].name='Aunt Bwalya';s.members[4].vis='hidden';
@@ -819,7 +979,7 @@ document.addEventListener('submit',function(e){var f=e.target;if(!f.getAttribute
  if(p2Submit(kind,fd,id))return;
  if(kind==='create'){
   var you=(fd.get('you')||'').trim(),hh=(fd.get('hh')||'').trim();if(!you||!hh)return fail('Enter your name and a household name.');
-  var s=emptyState(),mid='m_'+uid();s.household={id:uid(),name:hh,type:fd.get('type'),image:'',modules:{tasks:true,routines:true,inventory:true,bills:true,events:true,cleaning:true,meals:true,suggestions:true,announcements:true},currency:'ZMW',autoAdd:true,created:Date.now()};
+  var s=emptyState(),mid='m_'+uid();s.household={id:uid(),name:hh,type:fd.get('type'),image:'',modules:{tasks:true,routines:true,inventory:true,bills:true,events:true,cleaning:true,meals:true,suggestions:true,announcements:true},currency:defaultCurrency(),autoAdd:true,created:Date.now()};
   s.members=[mkMember(mid,you,'admin',0,'home')];s.me=mid;S=s;
   if(fd.get('starter')){var all=[0,1,2,3,4,5,6];S.routines=[mkRoutine('Lock up for the night','21:00',all,['Front door','Back door','All windows']),mkRoutine('Bedtime check','21:30',all,['Lights off','Charge phones','Set alarms'])]}
   logAct(first(you)+' created '+hh);UI.view='home';UI.wtab='signin';commit();toast('Welcome to '+hh+'. Invite people from the Household tab.');return}
@@ -902,7 +1062,7 @@ function p2Migrate(){
  var h=S.household;if(!h)return;
  if(h.modules.inventory===undefined)h.modules.inventory=true;
  if(h.modules.bills===undefined)h.modules.bills=true;
- if(!h.currency)h.currency='ZMW';
+ if(!h.currency)h.currency=defaultCurrency();
  if(h.autoAdd===undefined)h.autoAdd=true;
  if(S.sample&&!S._p2&&!S.inventory.length&&!S.bills.length)p2SeedInto(S)}
 function p2SeedInto(s){
@@ -2315,7 +2475,7 @@ var _cav=cloudAuthView;cloudAuthView=function(){var h=_cav(),i=h.lastIndexOf('</
 document.addEventListener('change',function(e){if(e.target&&e.target.id==='lang-sel')setLang(e.target.value)});
 
 /* ---------- currencies ---------- */
-var CUR_CODES=['ZMW','USD','EUR','GBP','ZAR','BWP','MWK','TZS','KES','UGX','NAD','MZN','AOA','CDF','RWF','ETB','GHS','NGN','XOF','XAF','EGP','MAD','ZWG','MUR','AED','SAR','INR','PKR','BDT','CNY','JPY','KRW','SGD','HKD','THB','IDR','PHP','AUD','NZD','CAD','CHF','SEK','NOK','DKK','PLN','TRY','BRL','MXN','ARS'];
+var CUR_CODES=['ZMW','USD','EUR','GBP','ZAR','BWP','MWK','TZS','KES','UGX','NAD','MZN','AOA','CDF','RWF','ETB','GHS','NGN','XOF','XAF','EGP','MAD','ZWG','MUR','AED','SAR','INR','PKR','BDT','CNY','JPY','KRW','SGD','HKD','THB','IDR','PHP','AUD','NZD','CAD','CHF','SEK','NOK','DKK','PLN','TRY','BRL','MXN','ARS','RUB','UAH','CZK','HUF','RON','ISK','ILS','KWD','QAR','JOD','LKR','NPR','KZT','UZS','VND','MYR','BND','KHR','MMK','LAK','MOP','TWD','FJD','PGK','XPF','CLP','COP','PEN','UYU','PYG','BOB','DOP','CRC','GTQ','HNL','NIO','PAB','TTD','JMD','BSD','BBD','BZD','GYD','SRD','XCD','AFN','DZD','AMD','AZN','BHD','BYN','KMF','CUP','DJF','ERN','SZL','GEL','HTG','IQD','IRR','KGS','LBP','LYD','MGA','MVR','MNT','OMR','SOS','SDG','MRU','GNF','LRD','SLE','GMD','CVE','STN','SCR','SSP','WST','SBD','VUV','YER','SYP','TOP','TMT','ALL','BAM','MKD','RSD','MDL','TJS','BTN','KPW','BIF','LSL','TND','AWG','ANG','VES'];
 var CUR_FALL={ZMW:'Zambian kwacha',USD:'US dollar',EUR:'Euro',GBP:'British pound',ZAR:'South African rand'};
 function curName(c){try{return new Intl.DisplayNames([LANG==='en'?'en':LANG],{type:'currency'}).of(c)}catch(e){return CUR_FALL[c]||c}}
 function curList(){var l=CUR_CODES.map(function(c){return [c,curName(c)+' ('+c+')']}),pin=['ZMW','USD','EUR','GBP','ZAR'],head=pin.map(function(c){return l.filter(function(x){return x[0]===c})[0]}),rest=l.filter(function(x){return pin.indexOf(x[0])<0}).sort(function(a,b){return a[1].localeCompare(b[1])});
