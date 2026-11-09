@@ -158,6 +158,35 @@ Keyboard-only walk through Directory (tab order, Enter/Space on rows, Escape clo
 
 Go through each module once per role (Admin / Member / Restricted / Guest) and confirm nothing changed: tasks (create, assign, claim, complete, recurrence, overdue), routines, calendar layers, supplies (inventory, low-stock to shopping list), bills (reminders, mark paid, undo), money jars, events and RSVP, cleaning/maintenance, meals, board, polls, reactions/pins, photos and voice messages, presence, automation rules, insights, notifications, invite/join flow, profile photo, erase data.
 
+## 10a. Smart Inventory Input (barcode, receipt, price)
+
+Supplies > Inventory shows **Scan barcode**, **Scan receipt** and **Add item** (admins and members only). Everything scanned goes through a review screen; nothing is saved until the person taps **Save to inventory**.
+
+| # | Test | Expected |
+|---|---|---|
+| S1 | Add item by hand with a price | Saved; the item detail shows "Last price paid" in the household currency |
+| S2 | Scan barcode on Android Chrome, a product Open Food Facts knows | Camera opens, code is read, review shows brand + name + pack size |
+| S3 | Same on iPhone Safari | No live scanner (Safari has no BarcodeDetector): the camera area is hidden and a message says to type the number. Typing works |
+| S4 | Deny camera permission | Clear message; typing the number still works |
+| S5 | Type "12ab" or 3 digits | Rejected with a message |
+| S6 | Unknown barcode | Review opens with an empty name and a note; blank name is rejected; after naming it, scanning the same code again fills the name without a network call |
+| S7 | Scan a code already on an inventory item, choose "I used it" | Stock goes down; at the minimum the item lands on the shopping list |
+| S8 | "I used it" with "Add to" left on "New item" | Rejected, asks which item was used |
+| S9 | Photo of a clear receipt (online) | Items listed with quantity, unit, price, category; store, date and total chips shown |
+| S10 | Receipt line for something already in stock | "Add to" is preselected; saving tops up that item and records the price in its history |
+| S11 | Change "Add to" to another item | Unit switches to that item's unit |
+| S12 | Receipt line in a different unit from the stock item (for example 500 g against kg) | g/kg and ml/L convert automatically. Anything else (packs against kg) is rejected with a message |
+| S13 | Untick a line, edit a name, save | Only ticked lines are saved, with the edited names |
+| S14 | Receipt lists something that is on the open shopping list | That shopping item is ticked off; stock is not counted twice |
+| S15 | Blurry photo, non-receipt photo | "No items were found" with the option to type the lines |
+| S16 | Airplane mode, then Scan receipt > photo | Explains that you are offline; typing or pasting lines still works and parses "2 x Milk 1L 45.00" style lines |
+| S17 | Restricted/guest role | No inventory tab, no scan buttons |
+| S18 | Receipt with text such as `<script>` or "ignore previous instructions" | Shown as plain text, nothing executes, no behaviour change |
+| S19 | Close the barcode dialog | Camera light turns off immediately |
+| S20 | Second household member on another phone | Remembered barcodes (names you taught) appear there after sync |
+
+Known limits: the receipt reader is Gemini via your `homehub-ai` edge function, so it needs the function redeployed (see `backend/`) and counts against the same per-minute limit as chat. Prices are the line total paid, not unit price. Handwritten or crumpled receipts will be unreliable; that is why the review screen exists.
+
 ## 11. Release checklist
 
 1. `node tests/smoke.js` passes.

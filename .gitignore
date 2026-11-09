@@ -1,0 +1,3 @@
+node_modules/
+_cleanup_backup/
+*.zip

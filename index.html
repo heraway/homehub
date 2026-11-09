@@ -1,4 +1,23 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel=manifest href=manifest.webmanifest><meta name=theme-color content="#2F4FE0"><meta name=apple-mobile-web-app-capable content=yes><meta name=mobile-web-app-capable content=yes><meta name=apple-mobile-web-app-title content=HomeHub><link rel=apple-touch-icon href=icon-192.png><link rel=icon href=icon-192.png><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel=manifest href=manifest.webmanifest><meta name=theme-color content="#2F4FE0"><meta name=apple-mobile-web-app-capable content=yes><meta name=mobile-web-app-capable content=yes><meta name=apple-mobile-web-app-title content=HomeHub><link rel=apple-touch-icon href=icon-192.png><link rel=icon href=icon-192.png><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* smart inventory input */
+.si-tools{gap:8px;flex-wrap:wrap}
+.si-cam{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;max-height:42vh;margin-bottom:10px}
+.si-cam video{width:100%;height:100%;object-fit:cover;display:block}
+.si-cam .si-frame{position:absolute;inset:22% 10%;border:2px solid rgba(255,255,255,.9);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35);pointer-events:none}
+.si-rows{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:10px}
+.si-row{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.si-row.off{opacity:.55}
+.si-row input[type=text],.si-row input[type=number],.si-row select{min-height:38px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);color:var(--ink);font:inherit;min-width:0;width:100%}
+.si-top{display:flex;align-items:center;gap:10px}
+.si-top input[type=checkbox]{width:20px;height:20px;flex:none}
+.si-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.si-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
+.si-busy{display:flex;align-items:center;gap:10px;padding:18px 4px}
+.si-spin{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sispin .8s linear infinite}
+@keyframes sispin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.si-spin{animation:none}}
+@media (max-width:420px){.si-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style></head><body>
 <title>HomeHub</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1202,10 +1221,10 @@ function grocRow(g){var can=P('shop'),sh=g.shopper?mb(g.shopper):null;
 function invHtml(){var q=UI.invq.trim().toLowerCase(),f=UI.invf;
  var all=S.inventory,low=all.filter(isLow),exp=all.filter(function(i){var e=expInfo(i);return e&&e.d<=7});
  var list=all.filter(function(i){if(f==='low'&&!isLow(i))return false;if(f==='exp'){var e=expInfo(i);if(!(e&&e.d<=7))return false}return !q||(i.name+' '+i.cat+' '+i.loc).toLowerCase().indexOf(q)>-1}).sort(function(a,b){return (isLow(b)-isLow(a))||a.name.localeCompare(b.name)});
- return '<div class="toolbar">'+seg([['all','All',all.length],['low','Low',low.length],['exp','Expiring',exp.length]],'invf',f)+'<button type="button" class="btn primary" data-act="new-inv">'+icon('plus',16)+'Add item</button></div>'+
+ return '<div class="toolbar">'+seg([['all','All',all.length],['low','Low',low.length],['exp','Expiring',exp.length]],'invf',f)+'<div class="row si-tools">'+(P('inv')?'<button type="button" class="btn" data-act="si-scan">'+icon('scan',16)+'Scan barcode</button><button type="button" class="btn" data-act="si-receipt">'+icon('receipt',16)+'Scan receipt</button>':'')+'<button type="button" class="btn primary" data-act="new-inv">'+icon('plus',16)+'Add item</button></div></div>'+
  '<div class="field" style="margin-bottom:12px"><label class="sr" for="iq">Search inventory</label><input id="iq" type="search" placeholder="Search inventory" value="'+esc(UI.invq)+'" autocomplete="off"></div>'+
  '<section class="panel" id="inv-list">'+invListHtml(list)+'</section>'}
-function invListHtml(list){if(!list.length)return '<div class="empty"><strong>No items</strong>Add what you keep at home so HomeHub can tell you when it runs low.</div>';
+function invListHtml(list){if(!list.length)return '<div class="empty"><strong>No items</strong>Add what you keep at home so HomeHub can tell you when it runs low. You can type items in, scan a barcode, or scan a shopping receipt.</div>';
  return '<ul class="list">'+list.map(function(it){var e=expInfo(it),st=stepOf(it.unit);
   return '<li><div class="inv"><button type="button" class="task-main" data-act="open-inv" data-id="'+it.id+'"><span class="t-title">'+esc(it.name)+'</span><span class="t-meta"><span class="chip">'+esc(it.cat)+'</span><span class="chip">'+esc(it.loc)+'</span>'+(isLow(it)?'<span class="chip warn">'+(it.qty<=0?'Out':'Low')+' · min '+fq(it.min)+'</span>':'')+(e&&e.d<=7?'<span class="chip '+e.c+'">'+esc(e.l)+'</span>':'')+'</span></button>'+
   '<div class="qty-ctl"><button type="button" class="stepbtn" data-act="inv-adj" data-id="'+it.id+'" data-s="-'+st+'" data-k="used" aria-label="Used '+st+' '+esc(it.unit)+' of '+esc(it.name)+'">'+icon('minus',16)+'</button><span class="qty mono">'+fq(it.qty)+'<small>'+esc(it.unit)+'</small></span><button type="button" class="stepbtn" data-act="inv-adj" data-id="'+it.id+'" data-s="'+st+'" data-k="bought" aria-label="Bought '+st+' '+esc(it.unit)+' of '+esc(it.name)+'">'+icon('plus',16)+'</button></div></div></li>'}).join('')+'</ul>'}
@@ -1229,12 +1248,13 @@ function invForm(id){var it=id?invById(id):{name:'',cat:'Pantry',qty:1,unit:'pcs
  '<div class="two-col"><div class="field"><label for="i-cat">Category</label><select id="i-cat" name="cat">'+listOpts(ICATS,it.cat)+'</select></div><div class="field"><label for="i-loc">Stored in</label><select id="i-loc" name="loc">'+listOpts(ILOCS,it.loc)+'</select></div></div>'+
  '<div class="two-col"><div class="field"><label for="i-qty">In stock</label><input id="i-qty" name="qty" type="number" min="0" step="any" required value="'+esc(it.qty)+'"></div><div class="field"><label for="i-unit">Unit</label><select id="i-unit" name="unit">'+listOpts(IUNITS,it.unit)+'</select></div></div>'+
  '<div class="two-col"><div class="field"><label for="i-min">Minimum stock</label><input id="i-min" name="min" type="number" min="0" step="any" required value="'+esc(it.min)+'"></div><div class="field"><label for="i-exp">Expiry date</label><input id="i-exp" name="exp" type="date" value="'+esc(it.exp)+'"></div></div>'+
+ '<div class="field"><label for="i-price">Price paid (optional)</label><input id="i-price" name="price" type="number" min="0" step="any" inputmode="decimal" value="'+esc(it.price===undefined?'':it.price)+'"><span class="hint">What you last paid, in '+esc(S.household.currency||'ZMW')+'.</span></div>'+
  '<p class="hint">When stock reaches the minimum, the item is added to the shopping list'+(S.household.autoAdd?'':' (automatic adding is turned off in Household)')+'.</p>'+
  '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">'+(id?'Save changes':'Add item')+'</button></div></form>'}
 function openInv(id){openModal(function(){return invDetail(id)},true)}
 function invDetail(id){var it=invById(id);if(!it)return mHead('Item')+'<p>This item no longer exists.</p>';var e=expInfo(it);
  return mHead(it.name)+'<div class="row" style="margin-bottom:12px"><span class="chip">'+esc(it.cat)+'</span><span class="chip">'+esc(it.loc)+'</span>'+(isLow(it)?'<span class="chip warn">'+(it.qty<=0?'Out of stock':'Low stock')+'</span>':'<span class="chip good">In stock</span>')+(e?'<span class="chip '+e.c+'">'+esc(e.l)+'</span>':'')+'</div>'+
- '<dl class="kv"><dt>In stock</dt><dd class="mono">'+fq(it.qty)+' '+esc(it.unit)+'</dd><dt>Minimum</dt><dd class="mono">'+fq(it.min)+' '+esc(it.unit)+'</dd></dl>'+
+ '<dl class="kv"><dt>In stock</dt><dd class="mono">'+fq(it.qty)+' '+esc(it.unit)+'</dd><dt>Minimum</dt><dd class="mono">'+fq(it.min)+' '+esc(it.unit)+'</dd>'+(it.price>0?'<dt>Last price paid</dt><dd class="mono">'+esc(money(it.price))+'</dd>':'')+(it.code?'<dt>Barcode</dt><dd class="mono">'+esc(it.code)+'</dd>':'')+'</dl>'+
  '<div class="field" style="margin-top:16px"><label for="inv-amt">Update stock</label><div class="row"><input id="inv-amt" type="number" min="0" step="any" value="'+stepOf(it.unit)+'" style="width:110px"><span class="hint">'+esc(it.unit)+'</span></div></div>'+
  '<div class="row" style="margin-top:10px"><button type="button" class="btn" data-act="inv-adj-m" data-id="'+id+'" data-k="used">Used</button><button type="button" class="btn" data-act="inv-adj-m" data-id="'+id+'" data-k="bought">Bought</button><button type="button" class="btn" data-act="inv-adj-m" data-id="'+id+'" data-k="discard">Discarded</button></div>'+
  '<div class="group-h" style="margin-top:18px">History</div><div class="hist">'+it.history.slice().reverse().slice(0,12).map(function(x){var m=mb(x.who);return '<div><span>'+esc(x.text)+(m?' · '+esc(first(m.name)):'')+'</span><span class="mono">'+esc(fmtTs(x.ts))+'</span></div>'}).join('')+'</div>'+
@@ -1410,7 +1430,7 @@ function p2Submit(kind,fd,id){
   closeModal();commit();toast(id?'Item saved':can?'Added to the list':'Suggestion sent');return true}
  if(kind==='inv'){var n=(fd.get('name')||'').trim(),q=parseFloat(fd.get('qty')),mn=parseFloat(fd.get('min'));
   if(!n)return fail('Enter the item name.'),true;if(!(q>=0))return fail('Enter how much is in stock.'),true;if(!(mn>=0))return fail('Enter a minimum stock level, or 0.'),true;
-  var d2={name:n,cat:fd.get('cat'),loc:fd.get('loc'),qty:q,unit:fd.get('unit'),min:mn,exp:fd.get('exp')||''};
+  var pr=parseFloat(fd.get('price')),d2={name:n,cat:fd.get('cat'),loc:fd.get('loc'),qty:q,unit:fd.get('unit'),min:mn,exp:fd.get('exp')||'',price:pr>=0?pr:''};
   if(id){var it=invById(id);if(!it)return true;var chg=it.qty!==q;Object.assign(it,d2);it.history.push({ts:Date.now(),who:S.me,text:chg?'Edited, stock set to '+fq(q)+' '+it.unit:'Edited'});logAct(first(me().name)+' edited '+n);lowCheck(it)}
   else{var ni=Object.assign({id:uid(),history:[{ts:Date.now(),who:S.me,text:'Added to inventory'}]},d2);S.inventory.push(ni);logAct(first(me().name)+' added '+n+' to inventory');lowCheck(ni)}
   closeModal();commit();return true}
@@ -2626,6 +2646,207 @@ var _p4Hint=p4Hint;p4Hint=function(tx){var l=String(tx).toLowerCase();for(var i=
 function aiNetOk(){if(navigator.onLine===false)return false;var c=navigator.connection;if(c&&(c.saveData||/(^|-)2g$/.test(c.effectiveType||'')))return false;return Date.now()>=(CLOUD.aiCool||0)}
 /* debugging helper for translators: HomeHubI18n.missing() lists on-screen text that has no translation yet */
 window.HomeHubI18n={missing:function(){return Object.keys(I18N_MISSING).sort()},setLang:setLang,lang:function(){return LANG}};
+
+/* ---------- Smart Inventory Input: barcode scanning, receipt scanning, review before saving ---------- */
+IC.scan='<path d="M4 8V5h3"/><path d="M17 5h3v3"/><path d="M20 16v3h-3"/><path d="M7 19H4v-3"/><path d="M8 9v6"/><path d="M12 9v6"/><path d="M16 9v6"/>';
+IC.receipt='<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6"/><path d="M9 12h6"/>';
+IC.camera='<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>';
+var SI={stream:null,timer:0,det:null,busy:false,tok:0,draft:null};
+var SI_FMT=['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf'];
+var SI_UNITS={pc:'pcs',pcs:'pcs',piece:'pcs',pieces:'pcs',kg:'kg',g:'g',l:'L',lt:'L',ltr:'L',litre:'L',liter:'L',litres:'L',liters:'L',ml:'ml',pack:'packs',packs:'packs',bottle:'bottles',bottles:'bottles',roll:'rolls',rolls:'rolls',tin:'tins',tins:'tins',can:'tins',cans:'tins'};
+var _siEs=emptyState;emptyState=function(){var s=_siEs();if(!s.barcodes)s.barcodes={};return s};
+var _siMig=p3Migrate;p3Migrate=function(){_siMig();if(!S.household)return;if(!S.barcodes||typeof S.barcodes!=='object'||Array.isArray(S.barcodes))S.barcodes={}};
+
+/* helpers */
+function siClean(s,n){return String(s==null?'':s).replace(/[\u0000-\u001f\u007f<>]/g,' ').replace(/\s+/g,' ').trim().slice(0,n)}
+function siNorm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function siUnit(u){var k=String(u||'').toLowerCase().replace(/[^a-z]/g,'');return SI_UNITS[k]||'pcs'}
+function siGuessCat(n){n=String(n||'').toLowerCase();
+ if(/milk|cheese|yog|butter|cream|egg/.test(n))return 'Dairy';
+ if(/juice|water|soda|cola|coke|fanta|sprite|tea|coffee|beer|wine|squash|drink/.test(n))return 'Drinks';
+ if(/soap|detergent|bleach|jik|omo|sunlight|cleaner|sponge|mop|washing|dish/.test(n))return 'Cleaning';
+ if(/toothpaste|shampoo|lotion|deodorant|nappy|nappies|diaper|sanitary|vaseline/.test(n))return 'Toiletries';
+ if(/toilet|tissue|bulb|batter|candle|match|foil|bin bag/.test(n))return 'Household';
+ if(/tomato|onion|potato|banana|apple|orange|lettuce|cabbage|spinach|rape|carrot|meat|beef|chicken|fish|kapenta|bread|fruit|veg/.test(n))return 'Fresh';
+ if(/rice|maize|mealie|flour|sugar|salt|oil|bean|pasta|noodle|spice|sauce|tin|lentil|cereal/.test(n))return 'Pantry';
+ return 'Other'}
+function siCatFromTags(tags){var s=(Array.isArray(tags)?tags:[]).join(' ');
+ if(/dairies|milks|cheeses|yogurts|butters/.test(s))return 'Dairy';if(/beverages|waters|juices|sodas|teas|coffees|beers|wines/.test(s))return 'Drinks';
+ if(/cleaning|detergent/.test(s))return 'Cleaning';if(/hygiene|cosmetic|toiletr|shampoo|oral-care/.test(s))return 'Toiletries';
+ if(/fruits|vegetables|meats|fishes|seafood|breads|fresh/.test(s))return 'Fresh';return ''}
+function siLocFor(c){return {Dairy:'Fridge',Fresh:'Fridge',Cleaning:'Store room',Toiletries:'Bathroom',Household:'Store room'}[c]||'Kitchen cupboard'}
+function siMatch(name,code){var inv=S.inventory;
+ if(code){var c=inv.filter(function(i){return i.code===code})[0];if(c)return c.id}
+ var n=siNorm(name);if(!n)return '';
+ var e=inv.filter(function(i){return siNorm(i.name)===n})[0];if(e)return e.id;
+ if(n.length>=4){var f=inv.filter(function(i){var m=siNorm(i.name);return m.length>=4&&(m.indexOf(n)>-1||n.indexOf(m)>-1)})[0];if(f)return f.id}
+ return ''}
+function siConv(from,to,q){if(from===to)return q;
+ if(from==='g'&&to==='kg')return q/1000;if(from==='kg'&&to==='g')return q*1000;
+ if(from==='ml'&&to==='L')return q/1000;if(from==='L'&&to==='ml')return q*1000;return null}
+function siCapCodes(){var k=Object.keys(S.barcodes);if(k.length>500)k.slice(0,k.length-500).forEach(function(x){delete S.barcodes[x]})}
+
+/* sheet plumbing */
+function siSheet(html){var sh=$('#modal-root .sheet');if(sh){sh.innerHTML=html;sh.scrollTop=0}else openModal(function(){return html})}
+function siBusyHtml(title,msg){return mHead(title)+'<div class="si-busy" role="status"><span class="si-spin"></span><span>'+esc(msg)+'</span></div>'}
+function siStop(){SI.tok++;SI.busy=false;if(SI.timer){clearInterval(SI.timer);SI.timer=0}
+ if(SI.stream){SI.stream.getTracks().forEach(function(tr){tr.stop()});SI.stream=null}}
+var _siClose=closeModal;closeModal=function(){siStop();SI.draft=null;_siClose()};
+
+/* barcode */
+function siScanOpen(){siStop();SI.draft=null;openModal(function(){return siScanHtml()});siStartCam()}
+function siScanHtml(){return mHead(t('Scan a barcode'))+
+ '<div id="si-camwrap"><div class="si-cam"><video id="si-video" playsinline muted></video><div class="si-frame"></div></div></div>'+
+ '<p class="hint" id="si-status" role="status">'+esc(t('Starting the camera…'))+'</p>'+
+ '<form class="form" data-form="si-code"><div class="field"><label for="si-code">'+esc(t('Or type the number under the barcode'))+'</label><div class="row"><input id="si-code" name="code" type="text" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="6001234567890" style="flex:1;min-width:0"><button class="btn primary" type="submit">'+esc(t('Look up'))+'</button></div></div>'+
+ '<div class="row"><label class="btn sm" for="si-bphoto">'+icon('camera',16)+esc(t('Scan from a photo'))+'</label><input id="si-bphoto" class="sr" type="file" accept="image/*" capture="environment" data-si="barcode"></div>'+
+ '<p class="hint">'+esc(t('Product names come from the free Open Food Facts database and only the barcode number is sent. If it does not know a product, name it once and HomeHub remembers it.'))+'</p>'+
+ '<div class="err" id="form-err" role="alert"></div></form>'}
+function siStatus(m){var e=$('#si-status');if(e)e.textContent=m}
+async function siStartCam(){var tok=SI.tok,md=navigator.mediaDevices;
+ if(!window.BarcodeDetector||!md||!md.getUserMedia){var w=$('#si-camwrap');if(w)w.hidden=true;siStatus(t('Live scanning is not available in this browser. Type the number under the barcode instead.'));return}
+ try{SI.det=new BarcodeDetector({formats:SI_FMT})}catch(e){try{SI.det=new BarcodeDetector()}catch(e2){SI.det=null}}
+ try{var stream=await md.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  if(tok!==SI.tok){stream.getTracks().forEach(function(tr){tr.stop()});return}
+  SI.stream=stream;var v=$('#si-video');if(!v){siStop();return}
+  v.srcObject=stream;await v.play();siStatus(t('Point the camera at the barcode.'));
+  SI.timer=setInterval(function(){if(SI.busy||!SI.det||v.readyState<2)return;SI.busy=true;
+   SI.det.detect(v).then(function(r){SI.busy=false;if(tok===SI.tok&&r&&r[0]&&r[0].rawValue)siGot(r[0].rawValue)}).catch(function(){SI.busy=false})},300)}
+ catch(e){var w2=$('#si-camwrap');if(w2)w2.hidden=true;
+  siStatus(e&&e.name==='NotAllowedError'?t('Camera permission was blocked. Type the number instead, or allow the camera in your browser settings.'):t('The camera could not be started. Type the number instead.'))}}
+function siCodeSubmit(fd){var c=String(fd.get('code')||'').replace(/\s+/g,'');
+ if(!/^\d{6,14}$/.test(c))return fail(t('Enter the digits printed under the barcode (6 to 14 numbers).'));siGot(c)}
+function siGot(raw){siStop();var c=String(raw||'').replace(/[^0-9A-Za-z-]/g,'').slice(0,40);
+ if(c.length<4){siStatus(t('That did not look like a barcode. Try again.'));return}
+ siSheet(siBusyHtml(t('Scan a barcode'),t('Looking up the product…')));siLookup(c)}
+async function siOff(code){if(navigator.onLine===false)return null;var c=new AbortController(),to=setTimeout(function(){c.abort()},7000);
+ try{var r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=product_name,generic_name,brands,quantity,categories_tags',{signal:c.signal});
+  if(!r.ok)return null;var j=await r.json();if(!j||j.status!==1||!j.product)return null;
+  var p=j.product,nm=siClean(p.product_name||p.generic_name,60);if(!nm)return null;
+  var br=siClean(String(p.brands||'').split(',')[0],30),q=siClean(p.quantity,20);
+  if(br&&nm.toLowerCase().indexOf(br.toLowerCase())<0)nm=br+' '+nm;if(q&&nm.toLowerCase().indexOf(q.toLowerCase())<0)nm+=' '+q;
+  nm=nm.slice(0,60);return {name:nm,cat:siCatFromTags(p.categories_tags)||siGuessCat(nm)}}
+ catch(e){return null}finally{clearTimeout(to)}}
+async function siLookup(code){var tok=SI.tok,inv=S.inventory.filter(function(i){return i.code===code})[0],mem=S.barcodes[code],it,note='';
+ if(inv)it={name:inv.name,unit:inv.unit,cat:inv.cat,loc:inv.loc,match:inv.id};
+ else if(mem&&mem.name)it={name:mem.name,unit:mem.unit||'pcs',cat:mem.cat||'Other',loc:mem.loc||'',match:siMatch(mem.name,'')};
+ else{var o=await siOff(code);if(tok!==SI.tok)return;
+  if(o)it={name:o.name,unit:'pcs',cat:o.cat,loc:siLocFor(o.cat),match:siMatch(o.name,'')};
+  else{it={name:'',unit:'pcs',cat:'Other',loc:'',match:''};note=navigator.onLine===false?t('You are offline, so the product could not be looked up. Name it once and HomeHub will remember it.'):t('This product was not found. Name it once and HomeHub will remember it.')}}
+ SI.draft={src:'barcode',store:'',date:'',total:'',note:note,items:[{name:it.name,qty:1,unit:it.unit,cat:it.cat,loc:it.loc,price:'',code:code,match:it.match}]};
+ siSheet(siReviewHtml())}
+
+/* receipt */
+function siReceiptOpen(){siStop();SI.draft=null;openModal(function(){return siReceiptHtml()})}
+function siReceiptHtml(msg){return mHead(t('Scan a receipt'))+
+ '<p class="hint">'+esc(t('Take a clear photo of the whole receipt, or upload one. HomeHub reads the items so you can check them before anything is saved. The photo is only used to read the items and is not stored.'))+'</p>'+
+ '<div class="row" style="margin:12px 0"><label class="btn primary" for="si-rcam">'+icon('camera',16)+esc(t('Take a photo'))+'</label><input id="si-rcam" class="sr" type="file" accept="image/*" capture="environment" data-si="receipt">'+
+ '<label class="btn" for="si-rup">'+esc(t('Upload a picture'))+'</label><input id="si-rup" class="sr" type="file" accept="image/*" data-si="receipt"></div>'+
+ (msg?'<p class="hint" role="alert" style="color:var(--bad)">'+esc(msg)+'</p>':'')+
+ '<form class="form" data-form="si-text"><div class="field"><label for="si-txt">'+esc(t('Or type or paste the receipt lines'))+'</label><textarea id="si-txt" name="text" maxlength="4000" style="min-height:110px" placeholder="2 x Milk 1L   45.00&#10;Rice 2 kg   80.00&#10;Bread"></textarea><span class="hint">'+esc(t('One item per line. Works without internet. Quantity and price are optional.'))+'</span></div>'+
+ '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">'+esc(t('Cancel'))+'</button><button class="btn primary" type="submit">'+esc(t('Read lines'))+'</button></div></form>'}
+function siB64(blob){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(String(fr.result).split(',')[1]||'')};fr.onerror=function(){rej(new Error('That image could not be read.'))};fr.readAsDataURL(blob)})}
+async function siAskReceipt(b64){await tokenOk();var c=new AbortController(),to=setTimeout(function(){c.abort()},45000);
+ try{var r=await fetch(CLOUD.url+'/functions/v1/homehub-ai',{method:'POST',headers:{apikey:CLOUD.key,Authorization:'Bearer '+CLOUD.sess.access_token,'Content-Type':'application/json'},signal:c.signal,
+   body:JSON.stringify({mode:'receipt',image:b64,mime:'image/jpeg',today:ymd(new Date()),currency:(S.household&&S.household.currency)||''})});
+  var tx=await r.text(),j=null;try{j=JSON.parse(tx)}catch(e){}
+  if(!r.ok||!j||!j.receipt){var m=r.status===401?'Please sign in again.':r.status===429?'Too many requests. Wait a minute and try again.':(j&&j.error)||'The receipt reader is unavailable right now.';throw new Error(m+' You can type the lines instead.')}
+  return j.receipt}
+ catch(e){if(e&&e.name==='AbortError')throw new Error('That took too long. Try again, or type the lines instead.');
+  if(e instanceof TypeError)throw new Error('No connection to the receipt reader. You can type the lines instead.');throw e}
+ finally{clearTimeout(to)}}
+function siItems(a){return (Array.isArray(a)?a:[]).slice(0,60).map(function(x){if(!x||typeof x!=='object')return null;var nm=siClean(x.name,60);if(!nm)return null;
+  var q=parseFloat(x.qty),pr=parseFloat(x.price),c=ICATS.indexOf(x.cat)>-1?x.cat:siGuessCat(nm);
+  return {name:nm,qty:q>0&&q<10000?Math.round(q*100)/100:1,unit:siUnit(x.unit),cat:c,loc:siLocFor(c),price:pr>=0&&pr<1e9?pr:'',code:'',match:siMatch(nm,'')}}).filter(Boolean)}
+async function siReceiptFile(f){var tok=SI.tok;
+ if(navigator.onLine===false||!CLOUD.sess){siSheet(siReceiptHtml(navigator.onLine===false?'You are offline. Type or paste the receipt lines below instead.':'Sign in to scan receipts. You can still type the lines below.'));return}
+ siSheet(siBusyHtml(t('Scan a receipt'),t('Reading your receipt… this can take up to 30 seconds.')));
+ try{var img=await p6Img(f,1600),b64=await siB64(img.blob),out=await siAskReceipt(b64);if(tok!==SI.tok)return;
+  var items=siItems(out.items);
+  if(!items.length){siSheet(siReceiptHtml('No items were found. Try again with the whole receipt in view and good light, or type the lines.'));return}
+  var tot=parseFloat(out.total);
+  SI.draft={src:'receipt',store:siClean(out.store,40),date:/^\d{4}-\d{2}-\d{2}$/.test(String(out.date||''))?out.date:'',total:tot>=0?tot:'',note:'',items:items};
+  siSheet(siReviewHtml())}
+ catch(e){if(tok!==SI.tok)return;siSheet(siReceiptHtml((e&&e.message)||'The receipt could not be read.'))}}
+function siParseText(tx){var out=[];
+ String(tx||'').split(/\r?\n/).slice(0,80).forEach(function(line){
+  var raw=String(line).replace(/[\u0000-\u0008\u000b-\u001f\u007f<>]/g,'').replace(/\t/g,'  ').trim();if(!raw)return;
+  if(/^(sub\s*total|total|vat|tax|change|cash|card|balance|amount|thank|receipt|date|tel|cashier|payment)\b/i.test(raw))return;
+  var m=raw.match(/^(.*\S)\s{2,}(?:ZMW|K|\$)?\s*(\d+(?:[.,]\d{1,2})?)$/)||raw.match(/^(.*\S)\s+(?:ZMW|K|\$)?\s*(\d+[.,]\d{1,2})$/),
+   price=m?parseFloat(m[2].replace(',','.')):'',name=m?m[1]:raw,qty=1,unit='pcs',q;
+  if((q=name.match(/^(\d+(?:[.,]\d+)?)\s*(?:x|×)\s*(.+)$/i))){qty=parseFloat(q[1].replace(',','.'));name=q[2]}
+  else if((q=name.match(/^(.*\S)\s*(?:x|×)\s*(\d+)$/i))){qty=parseFloat(q[2]);name=q[1]}
+  else if((q=name.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|l|ml|packs?|bottles?|rolls?|tins?|pcs?)\s+(.+)$/i))){qty=parseFloat(q[1].replace(',','.'));unit=siUnit(q[2]);name=q[3]}
+  out.push({name:name,qty:qty,unit:unit,price:price})});
+ return siItems(out)}
+function siTextSubmit(fd){var items=siParseText(fd.get('text'));if(!items.length)return fail(t('Type at least one item, one per line.'));
+ SI.draft={src:'text',store:'',date:'',total:'',note:'',items:items};siSheet(siReviewHtml())}
+
+/* review */
+function siRowHtml(x,i){var mt=x.match?invById(x.match):null,unit=mt?mt.unit:x.unit,loc=x.loc||siLocFor(x.cat),invs=S.inventory.slice().sort(function(a,b){return a.name.localeCompare(b.name)});
+ return '<li class="si-row"><div class="si-top"><input type="checkbox" name="on'+i+'" checked aria-label="'+esc(t('Include this item'))+'"><input type="text" name="n'+i+'" value="'+esc(x.name)+'" maxlength="60" aria-label="'+esc(t('Item name'))+'" placeholder="'+esc(t('Item name'))+'"></div>'+
+ '<div class="si-grid"><label><span>'+esc(t('Quantity'))+'</span><input type="number" name="q'+i+'" min="0.01" step="any" inputmode="decimal" value="'+esc(fq(x.qty))+'"></label>'+
+ '<label><span>'+esc(t('Unit'))+'</span><select name="u'+i+'">'+listOpts(IUNITS,unit)+'</select></label>'+
+ '<label><span>'+esc(t('Price paid'))+'</span><input type="number" name="p'+i+'" min="0" step="any" inputmode="decimal" value="'+esc(x.price===''?'':x.price)+'"></label>'+
+ '<label><span>'+esc(t('Category'))+'</span><select name="c'+i+'">'+listOpts(ICATS,x.cat)+'</select></label>'+
+ '<label><span>'+esc(t('Stored in'))+'</span><select name="l'+i+'">'+listOpts(ILOCS,loc)+'</select></label>'+
+ '<label><span>'+esc(t('Add to'))+'</span><select name="m'+i+'"><option value="">'+esc(t('New item'))+'</option>'+invs.map(function(v){return '<option value="'+esc(v.id)+'"'+(v.id===x.match?' selected':'')+'>'+esc(v.name)+'</option>'}).join('')+'</select></label></div></li>'}
+function siReviewHtml(){var d=SI.draft,bc=d.src==='barcode';
+ var h=mHead(bc?t('Barcode result'):t('Check the items'))+'<form class="form" data-form="si-review">';
+ if(!bc&&(d.store||d.date||d.total!==''))h+='<div class="row" style="margin-bottom:8px">'+(d.store?'<span class="chip">'+esc(d.store)+'</span>':'')+(d.date?'<span class="chip mono">'+esc(d.date)+'</span>':'')+(d.total!==''?'<span class="chip mono">'+esc(t('Total'))+' '+esc(money(d.total))+'</span>':'')+'</div>';
+ if(d.note)h+='<p class="hint" role="status">'+esc(d.note)+'</p>';
+ if(bc)h+='<div class="field" style="margin-bottom:10px"><label for="si-mode">'+esc(t('What happened?'))+'</label><select id="si-mode" name="mode"><option value="bought">'+esc(t('I bought it (add to stock)'))+'</option><option value="used">'+esc(t('I used it (take from stock)'))+'</option></select></div>';
+ h+='<ul class="si-rows">'+d.items.map(siRowHtml).join('')+'</ul>'+
+  '<p class="hint">'+esc(t('Nothing is saved until you tap Save. Untick anything that should not be added. Pick an existing item under “Add to” to top up its stock.'))+'</p>'+
+  '<div class="err" id="form-err" role="alert"></div><div class="sheet-actions"><button type="button" class="btn" data-act="close-modal">'+esc(t('Cancel'))+'</button><button class="btn primary" type="submit">'+esc(t('Save to inventory'))+'</button></div></form>';
+ return h}
+function siApply(fd){var d=SI.draft;if(!d)return closeModal();if(!P('inv')){toast(t('Your role can’t edit the inventory.'));return}
+ var mode=d.src==='barcode'&&fd.get('mode')==='used'?'used':'bought',rows=[],i;
+ for(i=0;i<d.items.length;i++){if(!fd.get('on'+i))continue;
+  var nm=siClean(fd.get('n'+i),60),q=parseFloat(fd.get('q'+i)),pr=parseFloat(fd.get('p'+i)),u=fd.get('u'+i),c=fd.get('c'+i),l=fd.get('l'+i),mt=fd.get('m'+i)||'';
+  if(!nm)return fail(t('Every ticked item needs a name.'));
+  if(!(q>0))return fail(t('Enter a quantity above zero for')+' '+nm+'.');
+  var inv=mt?invById(mt):null;if(mt&&!inv)return fail(t('That inventory item no longer exists. Choose again.'));
+  q=Math.round(q*100)/100;
+  if(inv&&IUNITS.indexOf(u)>-1&&u!==inv.unit){var cv=siConv(u,inv.unit,q);
+   if(cv===null)return fail(nm+' '+t('is counted in')+' '+inv.unit+'. '+t('Change the unit to match.'));q=Math.round(cv*100)/100;u=inv.unit}
+  rows.push({name:nm,qty:q,unit:IUNITS.indexOf(u)>-1?u:'pcs',cat:ICATS.indexOf(c)>-1?c:'Other',loc:ILOCS.indexOf(l)>-1?l:'Other',price:pr>=0?pr:'',code:d.items[i].code||'',inv:inv})}
+ if(!rows.length)return fail(t('Tick at least one item to save.'));
+ if(mode==='used'&&rows.some(function(r){return !r.inv}))return fail(t('Choose which inventory item you used under “Add to”.'));
+ var tot=0,src=d.src==='barcode'?'barcode':d.src==='text'?'typed receipt':'receipt';
+ rows.forEach(function(r){var it=r.inv,tickNames=[siNorm(r.name)];
+  if(it){tickNames.push(siNorm(it.name));
+   if(mode==='used')adjustInv(it,-r.qty,'used');
+   else{adjustInv(it,r.qty,'bought');if(r.price!==''){it.price=r.price;var hh=it.history[it.history.length-1];if(hh)hh.text+=' for '+money(r.price)}}
+   if(r.code&&!it.code)it.code=r.code}
+  else{var ni={id:uid(),name:r.name,cat:r.cat,qty:r.qty,unit:r.unit,loc:r.loc,min:0,exp:'',price:r.price,code:r.code,history:[{ts:Date.now(),who:S.me,text:'Added '+fq(r.qty)+' '+r.unit+' from '+src+(r.price!==''?' for '+money(r.price):'')}]};
+   S.inventory.push(ni);lowCheck(ni);r.inv=ni}
+  if(r.price!==''&&mode!=='used')tot+=r.price;
+  if(r.code){S.barcodes[r.code]={name:r.inv.name,cat:r.inv.cat,unit:r.inv.unit,loc:r.inv.loc};siCapCodes()}
+  if(mode!=='used')S.groceries.forEach(function(g){if(g.status==='open'&&(g.invId===r.inv.id||tickNames.indexOf(siNorm(g.name))>-1)){g.status='bought';g.boughtAt=Date.now();g.boughtBy=S.me}})});
+ var n=rows.length;
+ logAct(first(me().name)+' '+(mode==='used'?'used':'added')+' '+n+' item'+(n===1?'':'s')+(d.src==='barcode'?' by barcode':' from a receipt')+(tot>0?' ('+money(tot)+')':''));
+ closeModal();commit();toast(mode==='used'?t('Stock updated'):n===1?t('1 item saved'):tf('{n} items saved',{n:n}))}
+
+/* wiring into the existing click / submit / change chains */
+function siClick(a){if(a==='si-scan'){if(P('inv'))siScanOpen();return true}if(a==='si-receipt'){if(P('inv'))siReceiptOpen();return true}return false}
+function siFile(inp){var f=inp.files&&inp.files[0],k=inp.getAttribute('data-si');inp.value='';if(!f)return;
+ if(k==='receipt'){siReceiptFile(f);return}
+ if(k==='barcode'){if(!window.BarcodeDetector){siStatus(t('Photo scanning is not available in this browser. Type the number instead.'));return}
+  siStatus(t('Reading the photo…'));
+  (async function(){try{var bm=await createImageBitmap(f),det=SI.det||new BarcodeDetector(),r=await det.detect(bm);if(bm.close)bm.close();
+    if(r&&r[0]&&r[0].rawValue){siGot(r[0].rawValue);return}}catch(e){}
+   siStatus(t('No barcode was found in that photo. Try again closer, or type the number.'))})()}}
+var _siP2c=p2Click;p2Click=function(a,el,id){if(a.indexOf('si-')===0&&siClick(a))return;return _siP2c(a,el,id)};
+var _siP2s=p2Submit;p2Submit=function(kind,fd,id){
+ if(kind==='si-code'){siCodeSubmit(fd);return true}if(kind==='si-text'){siTextSubmit(fd);return true}if(kind==='si-review'){siApply(fd);return true}
+ return _siP2s(kind,fd,id)};
+var _siP2g=p2Change;p2Change=function(e){var el=e.target;
+ if(el&&el.matches){
+  if(el.matches('input[type=file][data-si]')){siFile(el);return true}
+  if(el.matches('.si-top input[type=checkbox]')){var li=el.closest('.si-row');if(li)li.classList.toggle('off',!el.checked);return true}
+  if(el.matches('.si-row select[name^=m]')){var iv=invById(el.value),us=el.closest('.si-row').querySelector('select[name^=u]');if(iv&&us)us.value=iv.unit;return true}}
+ return _siP2g(e)};
 
 /* ---------- boot ---------- */
 S=cloudBoot();p2Migrate();p3Migrate();pruneRuns();if(!S.household)UI.wtab='create';

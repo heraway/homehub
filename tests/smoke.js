@@ -91,10 +91,71 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++};
   r3=await s3('@HomeHub yet another complicated thing');ok(calls===2,'cool-down after 429 skips AI: '+calls);
   r3=await s3('@HomeHub add eggs to the shopping list');ok(/added|already/.test(r3),'local still works during cool-down');
   console.log('ai errors:',c3.errs.length?c3.errs:'none');}
+ // ---- smart inventory input
+ {const c=await open('m1'),p=c.pg;let rcalls=0,offcalls=0,lastBody=null;
+  const J=(r,o)=>r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(o)});
+  await c.ctx.route(/functions\/v1\/homehub-ai/,r=>{rcalls++;lastBody=JSON.parse(r.request().postData());J(r,{receipt:{store:'Shoprite',date:'2026-11-08',currency:'ZMW',total:130,items:[{name:'Cooking oil 2L',qty:1,unit:'L',price:90,cat:'Pantry'},{name:'Bread',qty:2,unit:'pcs',price:40,cat:'Fresh'},{name:'<img src=x onerror=window.__xss=1>',qty:1,unit:'pcs',price:5,cat:'Other'}]}})});
+  await c.ctx.route(/openfoodfacts\.org/,r=>{offcalls++;J(r,/6001000000017/.test(r.request().url())?{status:1,product:{product_name:'Peanut Butter',brands:'Yum',quantity:'400 g',categories_tags:['en:spreads']}}:{status:0})});
+  const inv=async()=>{await p.click('.rail-link:has-text("Supplies")');await p.click('[data-act=sup-tab][data-t=inv]');await p.waitForTimeout(100)};
+  const rowQty=async n=>{const t=await p.locator('#inv-list li',{hasText:n}).first().locator('.qty').textContent().catch(()=>null);return t};
+  await inv();
+  ok(await p.locator('[data-act=si-scan]').count()===1&&await p.locator('[data-act=si-receipt]').count()===1,'SI: scan buttons shown to admin');
+  // manual entry with price
+  await p.click('[data-act=new-inv]');await p.fill('#i-name','Rice');await p.fill('#i-qty','2');await p.selectOption('#i-unit','kg');await p.fill('#i-min','1');await p.fill('#i-price','55');
+  await p.click('form[data-form=inv] button[type=submit]');await p.waitForTimeout(150);
+  await p.click('[data-act=open-inv]');ok((await p.textContent('#modal-root')).includes('Last price paid'),'SI: manual price saved and shown');await p.keyboard.press('Escape');
+  // typed receipt, matches Rice, adds Salt
+  await p.click('[data-act=si-receipt]');await p.fill('#si-txt','2 x Rice 1kg   60.00\nSalt\nTotal 70.00');await p.click('form[data-form=si-text] button[type=submit]');await p.waitForTimeout(100);
+  ok(await p.locator('.si-row').count()===2,'SI: typed receipt gives 2 rows, totals skipped');
+  ok((await p.locator('select[name=m0]').inputValue())!=='','SI: Rice line matched to existing item');
+  await p.fill('input[name=n1]','Salt');
+  await p.click('form[data-form=si-review] button[type=submit]');await p.waitForTimeout(150);
+  ok((await rowQty('Rice'))==='4kg','SI: matched item stock topped up (got '+(await rowQty('Rice'))+')');
+  ok(await p.locator('#inv-list li',{hasText:'Salt'}).count()===1,'SI: new item created from receipt');
+  // barcode: OFF lookup, save, rescan from memory, use it
+  await p.click('[data-act=si-scan]');await p.fill('#si-code','6001000000017');await p.click('form[data-form=si-code] button[type=submit]');await p.waitForTimeout(250);
+  ok((await p.inputValue('input[name=n0]'))==='Yum Peanut Butter 400 g'&&offcalls===1,'SI: barcode looked up online');
+  await p.click('form[data-form=si-review] button[type=submit]');await p.waitForTimeout(150);
+  ok(await p.locator('#inv-list li',{hasText:'Peanut Butter'}).count()===1,'SI: barcode item saved');
+  await p.click('[data-act=si-scan]');await p.fill('#si-code','6001000000017');await p.click('form[data-form=si-code] button[type=submit]');await p.waitForTimeout(250);
+  ok(offcalls===1&&(await p.locator('select[name=m0]').inputValue())!=='','SI: rescan uses household memory and matches item');
+  await p.selectOption('#si-mode','used');await p.click('form[data-form=si-review] button[type=submit]');await p.waitForTimeout(150);
+  ok((await rowQty('Peanut Butter'))==='0pcs','SI: barcode "used" reduces stock');
+  // unknown barcode: name it once, remembered
+  await p.click('[data-act=si-scan]');await p.fill('#si-code','6009999999999');await p.click('form[data-form=si-code] button[type=submit]');await p.waitForTimeout(250);
+  ok((await p.textContent('#modal-root')).includes('not found')&&(await p.inputValue('input[name=n0]'))==='','SI: unknown barcode asks for a name');
+  await p.click('form[data-form=si-review] button[type=submit]');ok((await p.textContent('#form-err')).includes('name'),'SI: blank name rejected');
+  await p.fill('input[name=n0]','Local Honey');await p.click('form[data-form=si-review] button[type=submit]');await p.waitForTimeout(150);
+  await p.click('[data-act=si-scan]');await p.fill('#si-code','6009999999999');await p.click('form[data-form=si-code] button[type=submit]');await p.waitForTimeout(250);
+  ok((await p.inputValue('input[name=n0]'))==='Local Honey'&&offcalls===2,'SI: taught barcode remembered');await p.keyboard.press('Escape');
+  ok(await p.locator('#modal-root .sheet').count()===0,'SI: modal closed cleanly');
+  // bad barcode input
+  await p.click('[data-act=si-scan]');await p.fill('#si-code','12ab');await p.click('form[data-form=si-code] button[type=submit]');ok((await p.textContent('#form-err')).includes('digits'),'SI: bad barcode rejected');await p.keyboard.press('Escape');
+  // receipt photo via AI, groceries ticked off, hostile text stays inert
+  await p.click('.rail-link:has-text("Supplies")');await p.click('[data-act=sup-tab][data-t=shop]');await p.click('[data-act=new-groc]');await p.fill('#g-name','Bread');await p.click('form[data-form=grocery] button[type=submit]');await p.waitForTimeout(100);
+  ok((await p.textContent('#view')).includes('Bread'),'SI: grocery "Bread" on the list');
+  await inv();await p.click('[data-act=si-receipt]');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
+  await p.setInputFiles('#si-rup',{name:'r.png',mimeType:'image/png',buffer:png});await p.waitForTimeout(700);
+  ok(rcalls===1&&lastBody&&lastBody.mode==='receipt'&&lastBody.image.length>20&&lastBody.mime==='image/jpeg','SI: receipt photo sent to AI function');
+  ok(await p.locator('.si-row').count()===3&&(await p.textContent('#modal-root')).includes('Shoprite'),'SI: AI items shown for review');
+  ok(await p.evaluate(()=>window.__xss===undefined),'SI: hostile receipt text is inert');
+  await p.click('form[data-form=si-review] button[type=submit]');await p.waitForTimeout(150);
+  ok(await p.locator('#inv-list li',{hasText:'Bread'}).count()===1,'SI: receipt items saved');
+  await p.click('[data-act=sup-tab][data-t=shop]');{const v=await p.textContent('#view');ok(!v.includes('Bread')&&v.includes('Peanut Butter'),'SI: bought grocery ticked off by receipt (and low-stock auto item stays)')}
+  // offline: photo path explains, typed path still works
+  await inv();await c.ctx.setOffline(true);await p.click('[data-act=si-receipt]');await p.setInputFiles('#si-rup',{name:'r.png',mimeType:'image/png',buffer:png});await p.waitForTimeout(300);
+  ok((await p.textContent('#modal-root')).includes('offline')&&rcalls===1,'SI: offline receipt photo explained, no call');
+  await p.fill('#si-txt','Matches');await p.click('form[data-form=si-text] button[type=submit]');await p.waitForTimeout(100);
+  ok(await p.locator('.si-row').count()===1,'SI: typed receipt works offline');await p.keyboard.press('Escape');await c.ctx.setOffline(false);
+  console.log('si errors:',c.errs.length?c.errs:'none');ok(c.errs.length===0,'SI: no page errors')}
  // ---- restricted user
  let c2=await open('m3');
  ok(await c2.pg.locator('.rail-link:has-text("Directory")').count()>0,'restricted sees directory');
  await c2.pg.click('.rail-link:has-text("Directory")');await c2.pg.click('[data-act=dir-new]');
  ok(await c2.pg.locator('input[name=scope][value=shared]').count()===0,'restricted cannot create shared');
+ await c2.pg.evaluate(()=>document.querySelector('[data-act=go][data-view=supplies]').click());await c2.pg.waitForTimeout(150);
+ ok((await c2.pg.textContent('#view')).includes('Shopping')||(await c2.pg.textContent('#view')).includes('to buy'),'restricted reaches supplies');
+ ok(await c2.pg.locator('[data-act=sup-tab][data-t=inv]').count()===0&&await c2.pg.locator('[data-act=si-scan],[data-act=si-receipt]').count()===0,'SI: restricted user has no inventory tab or scan buttons');
  console.log('restricted errors:',c2.errs.length?c2.errs:'none');
  await b.close();srv.close();console.log(fails?('FAILS: '+fails):'ALL PASSED');process.exit(fails?1:0)})();
